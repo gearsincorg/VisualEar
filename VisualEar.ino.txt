@@ -1,0 +1,343 @@
+/* ==================================================================
+  Cochlea.ino       The Visual Ear. 
+  (c) 2020 Phil Malone
+  
+  This version has the following attributes:
+  LED Type          DotStar
+  LED Num           25
+  LED Data          12
+  LED Clk           14
+  Number of LEDs    42
+  
+  Mic Type          I2S
+  Mic Clk           26
+  Mic Data          25
+  Mic WS            33
+  Sample Freq       36 kHz
+  Samples per burst 1024
+  Number of Bursts  6
+  Bursts per FFT    4
+
+ * Windowing types
+ *  FFT_WIN_TYP_RECTANGLE
+ *  FFT_WIN_TYP_HAMMING
+ *  FFT_WIN_TYP_HANN
+ *  FFT_WIN_TYP_TRIANGLE
+ *  FFT_WIN_TYP_NUTTALL
+ *  FFT_WIN_TYP_BLACKMAN
+ *  FFT_WIN_TYP_BLACKMAN_NUTTALL
+ *  FFT_WIN_TYP_BLACKMAN_HARRIS
+ *  FFT_WIN_TYP_FLT_TOP
+ *  FFT_WIN_TYP_WELCH
+================================================================== */ 
+
+#define  FASTLED_INTERNAL
+#include "FastLED.h"
+#include "driver/i2s.h"
+#include "arduinoFFT_float.h"
+
+TaskHandle_t AudioTask;
+TaskHandle_t FFTTask;
+
+//  =================  Multi-Task Shared Data =================
+
+// -- Audio Constants
+#define MIC_CLOCK_PIN       26                    // Serial Clock (SCK)
+#define MIC_DATA_PIN        25                    // Serial Data (SD)
+#define MIC_SEL_PIN         33                    // Word Select (WS)
+#define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
+
+const uint16_t SAMPLING_FREQ     = 36000;                     // Frequency at which microphone is sampled
+const uint16_t BURST_SAMPLES     =   512;                     // Number of audio samples taken in one "Burst"
+const uint16_t BURST_SAMPLES_AVG =     9;                     // Bit shift required to average one full Burst
+const uint16_t BURSTS_PER_AUDIO  =     8;                     // Number of Burst Buffers used to create a single Audio Packet
+const uint16_t EXTRA_BURSTS      =     2;                     // Extra Burst packets to avoid overlap
+const uint16_t NUM_BURSTS        = (BURSTS_PER_AUDIO + EXTRA_BURSTS);
+const uint16_t SIZEOF_BURST      = (BURST_SAMPLES << 2);      // Number of bytes in a Burst Buffer
+
+// -- FFT Constants
+const uint16_t FFT_SAMPLES = BURST_SAMPLES * BURSTS_PER_AUDIO; // Number of samples used to do FFT.  (BURST_SAMPLES * BURSTS_PER_AUDIO)
+const uint16_t FREQ_BINS   = (FFT_SAMPLES >> 1);              // Number or resulting Frequency Bins after FFT is done
+
+// -- LED Display Constants
+#define NUM_BANDS           59                    // Number of frequency bands being displayed as LEDs = Number of LEDs
+#define NUM_LEDS            (NUM_BANDS * 2)       // Number of frequency bands being displayed as LEDs = Number of LEDs
+#define LED_DATA_PIN        12            
+#define LED_CLOCK_PIN       14
+#define BRIGHTNESS         255                    // Max LED Brightness
+#define GAIN_DIVIDE       1400                    // Brighness control used to reduce frequency band magnitude to get LED brightness
+#define START_NOISE_FLOOR 3000                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
+#define BASE_NOISE_FLOOR  1000                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
+#define BAND_HUE_STEP        (200/NUM_BANDS)      // How much the LED Hue changes for each band.
+
+//=================  Shared Data =================
+// Timing Data
+uint32_t  audioCyclePeriod;
+uint32_t  FFTCyclePeriod;
+uint32_t  FFTConvertTime;
+
+// -- Audio Data
+const     i2s_port_t I2S_PORT = I2S_NUM_0;
+int8_t    nowFilling = 0;
+int32_t   audioBuffers[NUM_BURSTS][BURST_SAMPLES]; // Storage for multiple Bursts of audio input.  Allows overlaid save and read operations.
+
+// -- FFT Data
+int8_t    windowing_type = FFT_WIN_TYP_HANN ;
+int8_t    nowProcessing = -1;
+float     vReal[FFT_SAMPLES];
+float     vImag[FFT_SAMPLES];
+float     weights[FFT_SAMPLES];
+
+// -- LED Display Data
+uint32_t  bandValues[NUM_BANDS];
+uint16_t  bandMaxBin[NUM_BANDS] = {6,7,8,9,10,11,12,13,15,16,18,20,22,24,26,29,32,35,39,43,48,53,58,64,71,78,86,95,105,116,128,142,157,173,191,211,233,257,284,313,346,382,421,465,514,567,626,691,763,843,930,1027,1134,1252,1383,1526,1685,1861,2047};
+
+// -- Object Constructors
+arduinoFFT_float FFT = arduinoFFT_float(vReal, vImag, FFT_SAMPLES, SAMPLING_FREQ);
+CRGB       leds[NUM_LEDS];
+
+// -- General Setup
+void setup() {
+
+  // Setup High Speed Serial
+  Serial.begin(500000); 
+  initDisplay();
+  Serial.println("\nCochlea Started.");
+
+  // Create Audio Sampling Task, and wait for Microphone to stabilize
+  xTaskCreatePinnedToCore(
+                    AudioSample,   /* Task function. */
+                    "AudioSample", /* name of task. */
+                    20000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &AudioTask,      /* Task handle to keep track of created task */
+                    1);          /* pin task to core 1 */                  
+  delay(2000); 
+
+  // Create FFT and Display task
+  xTaskCreatePinnedToCore(
+                    FFTcode,     /* Task function. */
+                    "FFT",       /* name of task. */
+                    40000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &FFTTask,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 0 */
+  delay(100); 
+}
+
+// ###############################################################
+//  Core 1 Task.
+//  AudioSample: Sample the microphone and fill Burst buffers with audio
+// ###############################################################
+void AudioSample( void * pvParameters ){
+
+  int32_t   sample;
+  size_t    bytesRead;
+  uint32_t  thisCycle;
+  uint32_t  lastCycle;
+  
+  // The I2S config as per the example
+  const i2s_config_t i2s_config = {
+    .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),  // Receive, not transfer
+    .sample_rate = SAMPLING_FREQ,                       // 
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,       // Chosen Mic puts out 32 bits per channel
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,        // use left channel
+    .communication_format = i2s_comm_format_t(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,           // Interrupt level 1
+    .dma_buf_count = 4,                                 // number of buffers
+    .dma_buf_len = 128                                  // 128 samples per buffer (minimum)
+  };
+
+  // The pin config as per the setup
+  const i2s_pin_config_t pin_config = {
+    .bck_io_num = MIC_CLOCK_PIN,                        // Serial Clock (SCK)
+    .ws_io_num = MIC_SEL_PIN,                           // Word Select (WS)
+    .data_out_num = I2S_PIN_NO_CHANGE,                  // not used (only for speakers)
+    .data_in_num = MIC_DATA_PIN                         // Serial Data (SD)
+  };
+
+  Serial.print("Audio Sample Started on core ");
+  Serial.println(xPortGetCoreID());
+
+  // Configure the I2S driver and pins.
+  i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
+  i2s_set_pin(I2S_PORT, &pin_config);
+  delay(10);
+
+  // ======= Audio Sample LOOP =============
+  // Repeatedly fill sucessive Burst Buffers.  Try not to have ANY discontinuity.
+  while(true){
+    thisCycle = micros();
+    audioCyclePeriod = (thisCycle - lastCycle);
+    lastCycle = thisCycle;
+
+    // Start filling the current Burst Buffer
+    i2s_read(I2S_PORT, (char *)(audioBuffers[nowFilling]), SIZEOF_BURST, &bytesRead, 100);
+
+    // Move onto next burst buffer if all bytes were read
+    if (bytesRead == SIZEOF_BURST)
+      nowFilling = (nowFilling + 1) % NUM_BURSTS ;
+  } 
+}
+
+// ###############################################################
+// Core 0 Task.
+// FFTcode: Process each new Burst buffer and display it.
+// ###############################################################
+void FFTcode( void * pvParameters ){
+  uint32_t  thisCycle;
+  uint32_t  lastCycle;
+  
+  Serial.print("FFT Started on core ");
+  Serial.println(xPortGetCoreID());
+
+  // Load up the windowing weights.  Generate an array of weights based on type.
+  for (int i=0; i < FFT_SAMPLES; i++) {
+    weights[i] = 1.0;
+  }
+  FFT.Windowing(weights, FFT_SAMPLES, windowing_type, FFT_FORWARD);
+
+  // ======= FFT & Display LOOP =============
+  while(true){
+
+    // Wait for a new Burst buffer to start processing
+    if (nowProcessing != nowFilling) {
+      nowProcessing = nowFilling;
+
+      thisCycle = micros();
+      FFTCyclePeriod = (thisCycle - lastCycle);
+      lastCycle = thisCycle;
+
+      // Process the prior Burts as a single audio packet, then display the band intensities.
+      ComputeMyFFT();
+      updateDisplay();
+      FFTConvertTime = micros() - thisCycle;
+            
+      // Give time for idle task to run.
+    }
+    delay(1);  
+  }
+}
+
+// -- Display Processing & cycle times
+void loop() {
+  Serial.print("AC=");
+  Serial.print(audioCyclePeriod);
+  Serial.print(" uS, FFTC=");
+  Serial.print(FFTCyclePeriod);
+  Serial.print(" uS, FFT=");
+  Serial.print(FFTConvertTime);
+  Serial.println(" uS");
+  delay(1000);
+}
+
+// -- Process a group of Audio bursts, and generate an array of frequency bins.
+void ComputeMyFFT(void) {
+  
+  int32_t   bufferDC = 0;
+  int32_t * burstP;
+
+  // Determine DC component from Burst 0
+  burstP = audioBuffers[0];
+  for (uint16_t i = 0; i < BURST_SAMPLES; i++) {
+    bufferDC += (*burstP++ >> UNUSED_AUDIO_BITS);
+  }      
+  bufferDC = bufferDC >> BURST_SAMPLES_AVG;
+
+  // transfer audio burts into "real values" while removing DC component.  
+  for (uint8_t b = 0; b < BURSTS_PER_AUDIO; b++) {
+
+    // Get pointer for each sucessive Burst
+    burstP = audioBuffers[(nowProcessing + NUM_BURSTS + b - BURSTS_PER_AUDIO) % NUM_BURSTS];
+    uint16_t  burstOffset = BURST_SAMPLES * b;
+    
+    // Transfer audio samples from burst to Audio Packet and apply FFT wondow weight
+    for (uint16_t i = 0; i < BURST_SAMPLES; i++) {
+      vReal[burstOffset + i] =  (float)((*burstP++ >> UNUSED_AUDIO_BITS ) - bufferDC) * weights[burstOffset + i];
+    }      
+  }
+
+  // Clear out imaginary values and run the FFT and then convert to magnitudes
+  memset((void *)vImag, 0, sizeof(vImag));
+  FFT.Compute(FFT_FORWARD);
+  FFT.ComplexToMagnitude();
+}
+
+// Configure the LED string and preload the color values for each band.
+void  initDisplay(void) {
+  FastLED.addLeds<DOTSTAR, LED_DATA_PIN, LED_CLOCK_PIN, BGR>(leds, NUM_LEDS);
+  FastLED.setBrightness(BRIGHTNESS);
+
+  // preload the hue into each LED and set the saturation to full and brightness to low.
+  // This is a startup test to show that ALL LEDs are capable of displaying their base color.
+  for (int i = 0; i < NUM_BANDS; i++) {
+    leds[(i*2)    ] = CHSV(i * BAND_HUE_STEP , 255, 100);
+    // leds[(i*2) + 1] = CHSV(i * BAND_HUE_STEP , 255, 100);
+  }
+  FastLED.show();
+}
+
+// Update the LED string based on the intensities of all the Frequency bins.
+void  updateDisplay (void){
+  uint16_t ledBrightness;
+
+  // Allocate FFT results into LED Band buckets (
+  fillBandBuckets ();
+  
+  // Process the LED buckets into LED Intensities
+  for (byte band = 0; band < NUM_BANDS; band++) {
+    
+    // Scale the bars for the display
+    ledBrightness = bandValues[band] / GAIN_DIVIDE;  // To Do:  Adjust this value with a port or buttons
+    if (ledBrightness > BRIGHTNESS) 
+      ledBrightness = BRIGHTNESS;
+  
+    // Display LED bucket in the correct Hue.
+    leds[(band * 2)    ].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
+    // leds[(band * 2) + 1].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
+  }
+  
+  // Update LED display
+  FastLED.show();
+}
+
+// Group Frequency Bins into Band Buckets based on the maximum nun number for each band
+// Each band covers more bind because bins are linear and bands are logorithmic.
+void  fillBandBuckets (void){
+  uint16_t  frequency; 
+  uint16_t  bucket; 
+  uint16_t  minBucket = 1; // skip over the DC level, and start with second freq.
+  uint16_t  maxBucket = 0; 
+  uint32_t  bandValue;
+  uint32_t  noiseFloor;     
+
+  //  zero out all the LED band magnitudes.
+  memset(bandValues, 0, sizeof(bandValues));
+
+  // Cycle through each of the LED bands.  Set initial noise threshold high and drop down.
+  noiseFloor = START_NOISE_FLOOR;
+  minBucket = bandMaxBin[0];
+  
+  for (int band = 0; band < NUM_BANDS; band++){
+    // get the new maximum freq for this band.
+    maxBucket = bandMaxBin[band];
+
+    // Accumulate freq values from all bins that match this LED band,
+    for (int bucket = minBucket; bucket <= maxBucket; bucket++) {
+      bandValue = (uint32_t)vReal[bucket];          
+      if (bandValue > noiseFloor) {
+        bandValues[band] += bandValue;  
+      }
+    }
+    
+    // slide the max of this band to the min of next band.
+    minBucket = maxBucket + 1;
+
+    // Adjust Noise Floor
+    if (noiseFloor > BASE_NOISE_FLOOR) {
+      noiseFloor = 95 * noiseFloor / 100;  // equiv 0.95 factor.
+    }
+  }
+}
