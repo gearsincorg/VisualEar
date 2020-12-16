@@ -36,6 +36,7 @@ public:
   float read(unsigned short binNumber);
   float read(unsigned short binNumber, float noiseThreshold);
   float read(unsigned short binFirst, unsigned short binLast, float noiseThreshold);
+  void  setInputDivide(float divisor);
   virtual void update(void);
 
   ushort output[512] __attribute__ ((aligned (4)));
@@ -46,6 +47,7 @@ private:
   
   audio_block_t *blocklist[BURSTS_PER_AUDIO];
   short buffer[2048] __attribute__ ((aligned (4)));
+  float inputDivisor = 256;
   byte state;
   volatile bool outputflag;
   volatile bool missedBlock;

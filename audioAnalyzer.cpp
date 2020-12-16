@@ -2,6 +2,8 @@
 #include <AudioStream.h>
 #include "audioAnalyzer.h"
 
+int sampleCount = 0;
+
 AudioAnalyzeFFT::AudioAnalyzeFFT(void) : AudioStream(1, inputQueueArray),
                       state(0),
                       outputflag(false) {
@@ -30,6 +32,11 @@ bool AudioAnalyzeFFT::missingBlocks(){
   }
   return false;
 }
+
+void  AudioAnalyzeFFT::setInputDivide(float divisor){
+  inputDivisor = divisor;
+}
+
 
 float AudioAnalyzeFFT::read(unsigned short binNumber, float noiseThreshold) {
   float tempVal = vReal[binNumber];
@@ -66,7 +73,7 @@ void AudioAnalyzeFFT::update(void)
 
   blocklist[state] = block;
 
-  // Do we have a full ausio buffer?
+  // Do we have a full audio buffer?
   if (state == (BURSTS_PER_AUDIO - 1)) {
 
     // First find average level to remove DC bias.
@@ -78,14 +85,35 @@ void AudioAnalyzeFFT::update(void)
         }
     }
     DCLevel = sum >> SAMPLES_AVG_SHIFT; 
-
+    
     // Now transfer samples to float while removeing DC level
     dest = vReal;
     short w = 0;
-    for (byte burst=0; burst < BURSTS_PER_AUDIO; burst++, w++) {
+    float val;
+    for (byte burst=0; burst < BURSTS_PER_AUDIO; burst++) {
         src = blocklist[burst]->data;
-        for (short sample = 0; sample < BURST_SAMPLES; sample++) {
-          *dest++ = ((float)(*src++ - DCLevel) * weights[w]) / 16384.0       ;
+        for (short sample = 0; sample < BURST_SAMPLES; sample++,  w++) {
+/*
+          // DEBUG !!!!!!!!
+          if (sampleCount < 500){
+            Serial.print(sampleCount);
+            Serial.print(" ");
+            Serial.print(DCLevel);
+            Serial.print(" ");
+            Serial.print(*src);
+            Serial.print(" ");
+            Serial.print(weights[w]);
+            Serial.print(" ");
+          }
+*/
+          val = ((float)(*src++ - DCLevel) * weights[w]) / inputDivisor;
+          *dest++ = val;
+/*
+          if (sampleCount >  8000){
+            Serial.println(val);
+          }
+*/
+          sampleCount++;
         }
     }
 

@@ -58,8 +58,8 @@ const unsigned short SAMPLING_FREQ     = 44100;         // Frequency at which mi
 const unsigned short BURST_SAMPLES     =   128;         // Number of audio samples taken in one "Burst"
 const unsigned short BURSTS_PER_AUDIO  =    64;         // Number of Burst Buffers used to create a single Audio Packet
 const unsigned short BURSTS_PER_FFT_UPDATE = 4;         // Number of Burst received before doing an FFT update
-const unsigned short SAMPLES_AVG_SHIFT =    12;         // Bit shift required to average one full Sample
-const unsigned short EXTRA_BURSTS      =     2;         // Extra Burst packets to avoid overlap
+const unsigned short SAMPLES_AVG_SHIFT =    13;         // Bit shift required to average one full Sample
+const unsigned short EXTRA_BURSTS      =     8;         // Extra Burst packets to avoid overlap
 const unsigned short NUM_BURSTS        = (BURSTS_PER_AUDIO + EXTRA_BURSTS);
 const unsigned short SIZEOF_BURST      = (BURST_SAMPLES << 2);      // Number of bytes in a Burst Buffer
 
@@ -69,13 +69,12 @@ const unsigned short FREQ_BINS   = (FFT_SAMPLES >> 1);              // Number or
 
 // -- LED Display Constants
 #define NUM_BANDS           60                    // Number of frequency bands being displayed as LEDs = Number of LEDs
-#define NUM_LEDS            NUM_BANDS             // Number of frequency bands being displayed as LEDs = Number of LEDs
+#define NUM_LEDS            NUM_BANDS * 2         // Two LEDS per Band
 #define LED_DATA_PIN        12
 #define LED_CLOCK_PIN       14
-#define BRIGHTNESS         255                    // Max LED Brightness
 #define GAIN_DIVIDE       1400                    // Brighness control used to reduce frequency band magnitude to get LED brightness
 #define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
-#define BASE_NOISE_FLOOR    50                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
+#define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 #define BAND_HUE_STEP      220 / NUM_BANDS        // How much the LED Hue changes for each band.
 
 // ---------------------------------------------

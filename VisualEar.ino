@@ -16,6 +16,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <SerialFlash.h>
+#include <EEPROM.h>
 #include "audioAnalyzer.h"
 
 #define  FASTLED_INTERNAL
@@ -35,41 +36,128 @@ uint16_t  bandMaxBin[NUM_BANDS] = {11,12,13,14,16,18,19,21,24,26,29,32,35,39,43,
 //
 AudioInputI2S          audioInput;         // audio shield: mic or line-in
 AudioSynthToneSweep    toneSweep;
+AudioSynthToneSweepLog toneSweepLog;
 AudioSynthWaveformSine sinewave;
 
 AudioAnalyzeFFT        myFFT;
 
 // Connect either the live input or synthesized sine wave
-//AudioConnection patchCord1(audioInput, 0, myFFT, 0);
- AudioConnection patchCord1(toneSweep, 0, myFFT, 0);
+ AudioConnection patchCord1(audioInput, 0, myFFT, 0);
 // AudioConnection patchCord1(sinewave, 0, myFFT, 0);
+// AudioConnection patchCord1(toneSweep, 0, myFFT, 0);
+// AudioConnection patchCord1(toneSweepLog, 0, myFFT, 0);
+
+unsigned long startTime = millis();
+unsigned long lastTime = millis();
+unsigned long cycleTime = 0;
+
+#define       MIN_GAIN         0
+#define       MAX_GAIN        (NUM_LEDS - 1)
+#define       GAIN_HOLD_MS  1000
+#define       GAIN_STEP_MS   200
+#define       GAIN_UP_PIN      3
+#define       GAIN_DN_PIN      2
+
+#define       MIN_DIVIDE        10   
+#define       MAX_DIVIDE        500  
+
+#define       BRIGHTNESS       510                    // Max overall Brightness
+#define       MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
+
+#define       GAIN_ADDRESS    1
+
+unsigned long buttonStart = 0;
+bool          adjusting   = false;
+short         gain        = 0;
+bool          gainUp      = 0;      
+bool          lastgainUp  = 0;      
+bool          gainDn      = 0;      
+bool          lastgainDn  = 0;      
+short         gainStep    = 0;      
 
 void setup() {
-  Serial.begin(2000000); 
+  Serial.begin(500000); 
+
+  pinMode(GAIN_UP_PIN, INPUT_PULLUP);
+  pinMode(GAIN_DN_PIN, INPUT_PULLUP);
+  
   initDisplay();
+  setGain(EEPROM.read(GAIN_ADDRESS));
 
   // Audio connections require memory to work.  For more
   // detailed information, see the MemoryAndCpuUsage example
   AudioMemory(NUM_BURSTS);
 
   // Create a synthetic frequency sweep
-  toneSweep.play(1.0, 55, 19000, 20);
+  // toneSweep.play(0.01, 55, 19000, 100);
+  // toneSweepLog.play(0.01, 55, 19000, 6);
 
   // Create a synthetic sine wave
   sinewave.amplitude(1.0);
-  sinewave.frequency(18950);
-
+  sinewave.frequency(16000);
 }
 
-unsigned long startTime = millis();
-unsigned long lastTime = millis();
-unsigned long cycleTime = 0;
+void  bumpGain(int step) {
+  buttonStart = millis();
+  adjusting = true;
+  gainStep = step;
+  setGain(gain + step);  
+}
+
+// save the current selected gain value (which LED) and calculate Amplitude divide factor
+int  setGain(int newgain) {
+  double  divide;
+
+  if (newgain < MIN_GAIN)
+    newgain = MIN_GAIN;
+  else if (newgain > MAX_GAIN)
+    newgain = MAX_GAIN;
+
+  gain = newgain;
+  divide = MIN_DIVIDE + ((MAX_DIVIDE - MIN_DIVIDE) * (MAX_GAIN - gain) / MAX_GAIN) ;
+  myFFT.setInputDivide(divide);
+
+  FastLED.clear();
+  leds[gain].setHSV((gain>>1) * BAND_HUE_STEP, 255, 255);
+  FastLED.show();
+
+  EEPROM.write(GAIN_ADDRESS, gain);
+  return gain;
+}
+
+long  pressElapsed() {
+  return millis() - buttonStart;
+}
 
 void loop() {
-  float n;
-  int i;
 
-  if (myFFT.available()) {
+  // debounce
+  if (pressElapsed() > 100) {
+    gainUp = !digitalRead(GAIN_UP_PIN);
+    gainDn = !digitalRead(GAIN_DN_PIN);
+    
+    if (gainUp && !lastgainUp) {
+      bumpGain(1);
+    }
+  
+    if (gainDn && !lastgainDn) {
+      bumpGain(-1);
+    }
+  
+    lastgainUp = gainUp;
+    lastgainDn = gainDn;
+  
+    if (adjusting) {
+      if (pressElapsed() > GAIN_HOLD_MS) {
+        adjusting = false;
+      }
+      else if ((gainUp || gainDn) && (pressElapsed() > GAIN_STEP_MS)) {
+        bumpGain(gainStep);
+      }
+    }
+  }
+  
+  if (!adjusting && myFFT.available()) {
     // each time new FFT data is available
     // print it all to the Arduino Serial Monitor
     startTime = millis();
@@ -77,16 +165,24 @@ void loop() {
     lastTime = startTime;
 
     updateDisplay();
-    for (i=0; i < 500; i++) {
-      n = myFFT.read(i);
+
+   
+    float n;
+    int i;
+    for (i=0; i < 4000; i += 8) {
+      n = myFFT.read(i, i+8, 0);
       Serial.print(n);
       Serial.println(" 500");
     }
+
     Serial.print("-1 ");
     Serial.println(cycleTime);
+  
+    
   } else if (myFFT.missingBlocks()) {
-    toneSweep.play(1.0, 55, 19000, 20);
+    toneSweepLog.play(1.0, 55, 19000, 6);
   }
+  
 }
 
 // Configure the LED string and preload the color values for each band.
@@ -96,11 +192,17 @@ void  initDisplay(void) {
 
   // preload the hue into each LED and set the saturation to full and brightness to low.
   // This is a startup test to show that ALL LEDs are capable of displaying their base color.
-  for (int i = 0; i < NUM_BANDS; i++) {
-    leds[i] = CHSV(i * BAND_HUE_STEP , 255, 100);
+  for (int b = 100; b >= 0; b--) {
+    for (int i = 0; i < NUM_BANDS; i++) {
+      leds[i<<1]     = CHSV(i * BAND_HUE_STEP , 255, b);
+      leds[(i<<1) + 1] = CHSV(i * BAND_HUE_STEP , 255, b);
+    }
+    delay(20);
+    FastLED.show();
   }
-  FastLED.show();
+  delay(500);
 }
+
 // Update the LED string based on the intensities of all the Frequency bins.
 void  updateDisplay (void){
   uint16_t ledBrightness;
@@ -113,11 +215,18 @@ void  updateDisplay (void){
     
     // Scale the bars for the display
     ledBrightness = bandValues[band];
+
     if (ledBrightness > BRIGHTNESS) 
       ledBrightness = BRIGHTNESS;
   
-    // Display LED Band in the correct Hue.
-    leds[band].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
+    // Display LED Band in the correct Hue.  Spread intensity over TWO LEDs to get 511 counts
+    if (ledBrightness <= MAX_LED_BRIGHTNESS){
+      leds[(band<<1)   ].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
+      leds[(band<<1) +1].setHSV(band * BAND_HUE_STEP, 255, 0);
+    } else {
+      leds[(band<<1)   ].setHSV(band * BAND_HUE_STEP, 255, MAX_LED_BRIGHTNESS);
+      leds[(band<<1) +1].setHSV(band * BAND_HUE_STEP, 255, ledBrightness - MAX_LED_BRIGHTNESS);
+    }
   }
   
   // Update LED display
