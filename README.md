@@ -21,16 +21,14 @@ https://hackaday.io/project/175944-the-visual-ear
  My first instinct was to think of a spectrum analyzer display that you might see on a high-end audio amplifier.
  There is nothing new about visual audio-spectrum displays, but I decided that it would be important to provide MUCH finer spectral resolution, while still maintaining near real-time response.
 
- I decided to do some research and experiments to determine what was possible.
+Display Specs:
 
- > A lot of what I developed here was influenced strongly by Steve Marley https://github.com/s-marley/ESP32_FFT_VU
- 
- > An explanation of the Spreadsheet used to determine the Band Bins is found here: https://www.youtube.com/watch?v=Mgh2WblO5_c
- 
- > This project adapts the FFT library found here : https://github.com/kosme/arduinoFFT
- 
- I have spent a lot of time optimizing the sampling, processing and display methods.  Here is how the current code runs:
- 
+- Display Bands:  59 Bands, spanning 55 Hz - 17163 Hz (8.25 Octaves)
+- Intensity Range: Each Band is displayed with a secific color, and 512 intensity levels (Using 2 LEDS per band)
+- Display Update interval: 11.6 mSec (86 Hz)
+- Audio to Visual Latency:  Max 13 mSec (11.6 mSec acquisition + 2 mSec for dual FFT & display)
+- Visual Persistance:  Low Frequency (<800 Hz) 185 mSec.  High Frequency (> 880 Hz) 46 mSec.
+
  ** HOW IT WORKS 
  
  Note:  Program constants are referenced in this description as follows:  64 (CONSTANT_NAME)
@@ -48,6 +46,16 @@ https://hackaday.io/project/175944-the-visual-ear
  To capture and resolve low sounds, the Low FFT uses the entire Audio Packet, but it only processes every fourth sample.  This enables the FFT to work with a smaller input sample set of 2048, which still produces 1024 frequency bins of 5.4Hz width.
  
  To capture and resolve rapid high sounds, the High-FFT only uses the most recent quarter of the Audio Packet, but at the full 44.1 kHz sample rate.  This enables this FFT to also work with a smaller input sample set of 2048, but produces 1024 frequency bins of 21.5Hz width.  Since this FFT is only using a quarter of the sample history, short-pulse sounds only persist for a max of 46.4 mSec, which should be able to display a 10 Hz drum-roll.
+ 
+CREDITS:
+
+ > A lot of what I developed here was influenced strongly by Steve Marley https://github.com/s-marley/ESP32_FFT_VU
+ 
+ > An explanation of the Spreadsheet used to determine the Band Bins is found here: https://www.youtube.com/watch?v=Mgh2WblO5_c
+ 
+ > This project adapts the FFT library found here : https://github.com/kosme/arduinoFFT
+ 
+ I have spent a lot of time optimizing the sampling, processing and display methods.  Here is how the current code runs:
  
 
  
