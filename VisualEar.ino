@@ -1,15 +1,8 @@
-// FFT Test
-//
-// Compute a 1024 point Fast Fourier Transform (spectrum analysis)
-// on audio connected to the Left Line-In pin.  By changing code,
-// a synthetic sine wave can be input instead.
-//
-// The first 40 (of 512) frequency analysis bins are printed to
-// the Arduino Serial Monitor.  Viewing the raw data can help you
-// understand how the FFT works and what results to expect when
-// using the data to control LEDs, motors, or other fun things!
-//
-// This example code is in the public domain.
+// Visual Ear
+// Audio spectrum analyser
+// LED strip display.
+// For details see:  https://hackaday.io/project/175944-the-visual-ear
+// By Phil Malone 2020-21
 
 #include <Audio.h>
 #include <Wire.h>
@@ -28,23 +21,19 @@ const int myInput = AUDIO_INPUT_LINEIN;
 
 // -- LED Display Data
 uint32_t  bandValues[NUM_BANDS];
-//uint16_t  bandMaxBin[NUM_BANDS] = {6,7,8,9,10,11,12,13,15,16,18,20,22,24,26,29,32,35,39,43,48,53,58,64,71,78,86,95,105,116,128,142,157,173,191,211,233,257,284,313,346,382,421,465,514,567,626,691,763,843,930,1027,1134,1252,1383,1526,1685,1861,2047};
 uint16_t  bandMaxBin[NUM_BANDS] = {11,12,13,14,16,18,19,21,24,26,29,32,35,39,43,47,52,58,64,71,78,86,95,105,116,128,141,156,172,190,210,231,256,282,312,344,380,419,463,511,564,623,688,760,839,926,1022,1129,1246,1376,1519,1677,1852,2044,2257,2492,2752,3038,3354,3703};
 
 // Create the Audio components.  These should be created in the
 // order data flows, inputs/sources -> processing -> outputs
-//
-AudioInputI2S          audioInput;         // audio shield: mic or line-in
-AudioSynthToneSweep    toneSweep;
-AudioSynthToneSweepLog toneSweepLog;
-AudioSynthWaveformSine sinewave;
+AudioInputI2S          audioInput;     // audio shield: mic or line-in
+AudioSynthToneSweepLog toneSweepLog;   // custom audio input to sweep frequency with LOG increases
+AudioSynthWaveformSine sinewave;       // Standard Sine wave output
 
 AudioAnalyzeFFT        myFFT;
 
 // Connect either the live input or synthesized sine wave
- AudioConnection patchCord1(audioInput, 0, myFFT, 0);
+AudioConnection patchCord1(audioInput, 0, myFFT, 0);
 // AudioConnection patchCord1(sinewave, 0, myFFT, 0);
-// AudioConnection patchCord1(toneSweep, 0, myFFT, 0);
 // AudioConnection patchCord1(toneSweepLog, 0, myFFT, 0);
 
 unsigned long startTime = millis();
