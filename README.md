@@ -26,7 +26,7 @@ Display Specs:
 - Display Bands:  59 Bands, spanning 55 Hz - 17163 Hz (8.25 Octaves)
 - Intensity Range: Each Band is displayed with a secific color, and 512 intensity levels (Using 2 LEDS per band)
 - Display Update interval: 11.6 mSec (86 Hz)
-- Audio to Visual Latency:  Max 13 mSec (11.6 mSec acquisition + 2 mSec for dual FFT & display)
+- Audio to Visual Latency:  Max 13.5 mSec (11.6 mSec acquisition + 1.9 mSec for dual FFT & display)
 - Visual Persistance:  Low Frequency (<800 Hz) 185 mSec.  High Frequency (> 880 Hz) 46 mSec.
 
  ** HOW IT WORKS 
