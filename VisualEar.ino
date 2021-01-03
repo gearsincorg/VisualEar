@@ -1,8 +1,23 @@
-// Visual Ear
-// Audio spectrum analyser
-// LED strip display.
-// For details see:  https://hackaday.io/project/175944-the-visual-ear
-// By Phil Malone 2020-21
+/*
+  Visual Ear
+  Audio spectrum analyser
+  LED strip display.
+  For details see:  https://hackaday.io/project/175944-the-visual-ear
+  Copyright (C) 2021 Philip Malone
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <Audio.h>
 #include <Wire.h>
@@ -14,19 +29,47 @@
 
 #define  FASTLED_INTERNAL
 #include "FastLED.h"
-CRGB     leds[NUM_LEDS];
+
+// -- LED Display Constants
+#define NUM_LO_BANDS        29                    // Number of LOW frequency bands  
+#define NUM_HI_BANDS        30                    // Number of HIGH frequency bands
+#define NUM_BANDS           59                    // Total Number of frequency bands being displayed
+#define NUM_LEDS            NUM_BANDS * 2         // Two LEDS per Band
+#define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
+#define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
+#define BAND_HUE_STEP      220 / NUM_BANDS        // How much the LED Hue changes for each band.
+
+#define LED_DATA_PIN        12
+#define LED_CLOCK_PIN       14
+
+#define       MIN_GAIN         0
+#define       MAX_GAIN        (NUM_LEDS - 1)
+#define       GAIN_HOLD_MS  1000
+#define       GAIN_STEP_MS   200
+#define       GAIN_UP_PIN      3
+#define       GAIN_DN_PIN      2
+
+#define       MIN_DIVIDE        10   
+#define       MAX_DIVIDE        400  
+
+#define       BRIGHTNESS       510                    // Max overall Brightness
+#define       MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
+
+#define       GAIN_ADDRESS    1
 
 const int myInput = AUDIO_INPUT_LINEIN;
 //const int myInput = AUDIO_INPUT_MIC;
 
 // -- LED Display Data
+CRGB      leds[NUM_LEDS];
 uint32_t  bandValues[NUM_BANDS];
-uint16_t  bandMaxBin[NUM_BANDS] = {11,12,13,14,16,18,19,21,24,26,29,32,35,39,43,47,52,58,64,71,78,86,95,105,116,128,141,156,172,190,210,231,256,282,312,344,380,419,463,511,564,623,688,760,839,926,1022,1129,1246,1376,1519,1677,1852,2044,2257,2492,2752,3038,3354,3703};
+uint16_t  LO_bandBins[NUM_LO_BANDS + 1] = {10,11,12,13,14,16,18,19,21,24,26,29,32,35,39,43,47,52,58,64,71,78,86,95,105,116,128,141,156,172};
+uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {43,47,52,58,64,71,78,86,95,105,116,128,141,156,172,190,210,231,256,282,312,344,380,419,463,511,564,623,688,760,839};
 
 // Create the Audio components.  These should be created in the
 // order data flows, inputs/sources -> processing -> outputs
 AudioInputI2S          audioInput;     // audio shield: mic or line-in
-AudioSynthToneSweepLog toneSweepLog;   // custom audio input to sweep frequency with LOG increases
+AudioSynthToneSweep    toneSweep;      // audio input to sweep frequency
 AudioSynthWaveformSine sinewave;       // Standard Sine wave output
 
 AudioAnalyzeFFT        myFFT;
@@ -40,20 +83,6 @@ unsigned long startTime = millis();
 unsigned long lastTime = millis();
 unsigned long cycleTime = 0;
 
-#define       MIN_GAIN         0
-#define       MAX_GAIN        (NUM_LEDS - 1)
-#define       GAIN_HOLD_MS  1000
-#define       GAIN_STEP_MS   200
-#define       GAIN_UP_PIN      3
-#define       GAIN_DN_PIN      2
-
-#define       MIN_DIVIDE        10   
-#define       MAX_DIVIDE        500  
-
-#define       BRIGHTNESS       510                    // Max overall Brightness
-#define       MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
-
-#define       GAIN_ADDRESS    1
 
 unsigned long buttonStart = 0;
 bool          adjusting   = false;
@@ -154,29 +183,15 @@ void loop() {
     lastTime = startTime;
 
     updateDisplay();
-
-   
-    float n;
-    int i;
-    for (i=0; i < 4000; i += 8) {
-      n = myFFT.read(i, i+8, 0);
-      Serial.print(n);
-      Serial.println(" 500");
-    }
-
-    Serial.print("-1 ");
-    Serial.println(cycleTime);
-  
     
   } else if (myFFT.missingBlocks()) {
-    toneSweepLog.play(1.0, 55, 19000, 6);
+    toneSweep.play(1.0, 55, 19000, 6);
   }
-  
 }
 
 // Configure the LED string and preload the color values for each band.
 void  initDisplay(void) {
-  delay(1000);      // sanity check delay
+  delay(250);      // sanity check delay
   FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
 
   // preload the hue into each LED and set the saturation to full and brightness to low.
@@ -225,38 +240,34 @@ void  updateDisplay (void){
 // Group Frequency Bins into Band Buckets based on the maximum nun number for each band
 // Each band covers more bind because bins are linear and bands are logorithmic.
 void  fillBands (void){
-  uint16_t  minBin = 1; // skip over the DC level, and start with second freq.
-  uint16_t  maxBin = 0; 
-  uint32_t  noiseFloor;     
+  uint32_t  noiseFloor;  
+  uint8_t   band;   
 
   //  zero out all the LED band magnitudes.
   memset(bandValues, 0, sizeof(bandValues));
 
   // Cycle through each of the LED bands.  Set initial noise threshold high and drop down.
   noiseFloor = START_NOISE_FLOOR;
-  minBin = bandMaxBin[0] - 1;
-  
-  for (int band = 0; band < NUM_BANDS; band++){
-    // get the new maximum freq for this band.
-    maxBin = bandMaxBin[band];
-
-    // Accumulate freq values from all bins that match this LED band,
-    bandValues[band] = (uint32_t)myFFT.read(minBin, maxBin, noiseFloor);
-
-    /*
-    for (int bin = minBin; bin <= maxBin; bin++) {
-      bandValue = (uint32_t)myFFT.read(bin);        
-      if (bandValue > noiseFloor)  
-       bandValues[band] += bandValue;  
-    }
-    */
+  band = 0;
     
-    // slide the max of this band to the min of next band.
-    minBin = maxBin + 1;
+  for (int b = 0; b < NUM_LO_BANDS; b++, band++){
+    // Accumulate freq values from all bins that match this LED band,
+    bandValues[band] = (uint32_t)myFFT.read(false, LO_bandBins[b], LO_bandBins[b+1], noiseFloor);
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
       noiseFloor = 95 * noiseFloor / 100;  // equiv 0.95 factor.
     }
   }
+
+  for (int b = 0; b < NUM_HI_BANDS; b++, band++){
+    // Accumulate freq values from all bins that match this LED band,
+    bandValues[band] = (uint32_t)myFFT.read(true, HI_bandBins[b], HI_bandBins[b+1], noiseFloor);
+
+    // Adjust Noise Floor
+    if (noiseFloor > BASE_NOISE_FLOOR) {
+      noiseFloor = 95 * noiseFloor / 100;  // equiv 0.95 factor.
+    }
+  }
+
 }

@@ -3,6 +3,7 @@
 	FFT libray
 	Copyright (C) 2010 Didier Longueville
 	Copyright (C) 2014 Enrique Condes
+  Copyright (C) 2021 Philip Malone
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -47,56 +48,23 @@
 #define fourPi 12.56637061
 #define sixPi 18.84955593
 
-//  =================  Multi-Task Shared Data =================
-// -- Audio Constants
-#define MIC_CLOCK_PIN       26                    // Serial Clock (SCK)
-#define MIC_DATA_PIN        25                    // Serial Data (SD)
-#define MIC_SEL_PIN         33                    // unsigned short Select (WS)
-#define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
-
-const unsigned short SAMPLING_FREQ     = 44100;         // Frequency at which microphone is sampled
-const unsigned short BURST_SAMPLES     =   128;         // Number of audio samples taken in one "Burst"
-const unsigned short BURSTS_PER_AUDIO  =    64;         // Number of Burst Buffers used to create a single Audio Packet
-const unsigned short BURSTS_PER_FFT_UPDATE = 4;         // Number of Burst received before doing an FFT update
-const unsigned short SAMPLES_AVG_SHIFT =    13;         // Bit shift required to average one full Sample
-const unsigned short EXTRA_BURSTS      =     8;         // Extra Burst packets to avoid overlap
-const unsigned short NUM_BURSTS        = (BURSTS_PER_AUDIO + EXTRA_BURSTS);
-const unsigned short SIZEOF_BURST      = (BURST_SAMPLES << 2);      // Number of bytes in a Burst Buffer
-
-// -- FFT Constants
-const unsigned short FFT_SAMPLES = BURST_SAMPLES * BURSTS_PER_AUDIO; // Number of samples used to do FFT.  (BURST_SAMPLES * BURSTS_PER_AUDIO)
-const unsigned short FREQ_BINS   = (FFT_SAMPLES >> 1);              // Number or resulting Frequency Bins after FFT is done
-
-// -- LED Display Constants
-#define NUM_BANDS           60                    // Number of frequency bands being displayed as LEDs = Number of LEDs
-#define NUM_LEDS            NUM_BANDS * 2         // Two LEDS per Band
-#define LED_DATA_PIN        12
-#define LED_CLOCK_PIN       14
-#define GAIN_DIVIDE       1400                    // Brighness control used to reduce frequency band magnitude to get LED brightness
-#define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
-#define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
-#define BAND_HUE_STEP      220 / NUM_BANDS        // How much the LED Hue changes for each band.
-
-// ---------------------------------------------
-
 class arduinoFFT_float {
   
 public:
 	/* Constructor */
-	arduinoFFT_float(void);
-	arduinoFFT_float(float *vReal, float *vImag, ushort samples, float samplingFrequency);
+  arduinoFFT_float(void); 
+  arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, float samplingFrequency, uint8_t windowType); 
+  
 	/* Destructor */
 	~arduinoFFT_float(void);
+  
 	/* Functions */
+  void RunFFT(void);
 	byte Revision(void);
 	byte Exponent(ushort value);
-
 	void ComplexToMagnitude(float *vReal, float *vImag, ushort samples);
 	void Compute(float *vReal, float *vImag, ushort samples, byte dir);
 	void Compute(float *vReal, float *vImag, ushort samples, byte power, byte dir);
-	void DCRemoval(float *vData, ushort samples);
-	float MajorPeak(float *vD, ushort samples, float samplingFrequency);
-	void MajorPeak(float *vD, ushort samples, float samplingFrequency, float *f, float *v);
 	void Windowing(float *vData, ushort samples, byte windowType, byte dir);
 
 	void ComplexToMagnitude();
@@ -110,7 +78,8 @@ private:
 	ushort _samples;
 	float _samplingFrequency;
 	float *_vReal;
-	float *_vImag;
+  float *_vImag;
+  float *_weights;
 	byte _power;
 	/* Functions */
 	void Swap(float *x, float *y);

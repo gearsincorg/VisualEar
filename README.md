@@ -29,3 +29,25 @@ https://hackaday.io/project/175944-the-visual-ear
  
  > This project adapts the FFT library found here : https://github.com/kosme/arduinoFFT
  
+ I have spent a lot of time optimizing the sampling, processing and display methods.  Here is how the current code runs:
+ 
+ ** HOW IT WORKS 
+ 
+ Note:  Program constants are referenced in this description as follows:  64 (CONSTANT_NAME)
+ 
+ The Teensy audio library is used to sample the I2S digital microphone continuously at the standard 44100 Hz rate.  Successive Bursts of 128 samples are cataloged and saved as an array of Burst pointers.  This array holds 72 (NUM_BURSTS) Burst pointers.  Only 64 (BURSTS_PER_AUDIO) of these are being processed at any time.  The remaining 8 (EXTRA_BURSTS) are used to start capturing more audio while the current Packet of 64 Bursts is processed.  
+ 
+ To cover the full 55-17,153 Hz spectrum, it’s necessary to aquire 8192 samples (64 Bursts of 128 samples).  But this would take 185 mSec to collect, so it’s not practical to wait for the full sample to be collected before updating the display.  
+ 
+ To permit faster display updates, a sliding window is created to process the most recent 64 Bursts, every time a new set of 4 (BURSTS_PER_FFT_UPDATE) Bursts have been received.  This event occurs every 11.6 mSec, which becomes the update rate for the overall display (86 updates per second).
+ 
+ A standard FFT (Fast Fourier Transform) is used to convert the Audio Packet (8196 Samples) into frequency buckets.  Initially, a single FFT was used to process the entire sample.  This transform could be performed in the available 11.6 mSec, but a high frequency sound spike would be spread over the entire 185 mS sample duration.  So a sudden sound would appear quickly, but it would persist on the display for the full 185 mSec.  This effectively limits the responsiveness of the system to rapid sounds like a drum roll.
+ 
+ To accommodate BOTH slow low-frequency sounds, and rapid high-frequency sounds, the available Audio packet is processed by two separate FFTs.  Each optimized for a different frequency range.  The Low FFT is looking for sounds in the 55-880 Hz range.   The High FFT is looking for sounds in the 880-17,153 Hz range.  
+ 
+ To capture and resolve low sounds, the Low FFT uses the entire Audio Packet, but it only processes every fourth sample.  This enables the FFT to work with a smaller input sample set of 2048, which still produces 1024 frequency bins of 5.4Hz width.
+ 
+ To capture and resolve rapid high sounds, the High-FFT only uses the most recent quarter of the Audio Packet, but at the full 44.1 kHz sample rate.  This enables this FFT to also work with a smaller input sample set of 2048, but produces 1024 frequency bins of 21.5Hz width.  Since this FFT is only using a quarter of the sample history, short-pulse sounds only persist for a max of 46.4 mSec, which should be able to display a 10 Hz drum-roll.
+ 
+
+ 

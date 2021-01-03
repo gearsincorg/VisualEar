@@ -3,6 +3,7 @@
 	FFT libray
 	Copyright (C) 2010 Didier Longueville
 	Copyright (C) 2014 Enrique Condes
+  Copyright (C) 2021 Philip Malone
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -27,15 +28,52 @@
 #include "arm_math.h"
 #include "arduinoFFT_float.h"
 
+//  =================  Multi-Task Shared Data =================
+// -- Audio Constants
+#define MIC_CLOCK_PIN       26                    // Serial Clock (SCK)
+#define MIC_DATA_PIN        25                    // Serial Data (SD)
+#define MIC_SEL_PIN         33                    // unsigned short Select (WS)
+#define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
+
+// Low Range Constants
+const unsigned short LO_SAMPLING_FREQ     = 11025;        // Frequency at which microphone is sampled (1/4 full)
+const unsigned short LO_FFT_SAMPLES       =  2048;        // Number of samples used to do FFT.
+const unsigned short LO_FREQ_BINS         =  LO_FFT_SAMPLES >> 1; // Number of results
+const unsigned short LO_FIRST_BURST       =    0;          // First burst in FFT source
+const unsigned short LO_BURSTS_PER_AUDIO  =    64;         // Number of Burst Buffers used to create a single Audio Packet (using 1 in 4 samples)
+
+
+// High Range Constants
+const unsigned short HI_SAMPLING_FREQ     = 44100;        // Frequency at which microphone is sampled
+const unsigned short HI_FFT_SAMPLES       =  2048;        // Number of samples used to do FFT. 
+const unsigned short HI_FREQ_BINS         =  HI_FFT_SAMPLES >> 1; // Number of results
+const unsigned short HI_FIRST_BURST       =    48;        // First burst in FFT source
+const unsigned short HI_BURSTS_PER_AUDIO  =    16;        // Number of Burst Buffers used to create a single Audio Packet
+
+// Audio Sample constants
+const unsigned short BURST_SAMPLES     =   128;         // Number of audio samples taken in one "Burst"
+const unsigned short BURSTS_PER_AUDIO  =    64;         // Number of Burst Buffers used to create a single Audio Packet
+const unsigned short BURSTS_PER_FFT_UPDATE = 4;         // Number of Burst received before doing an FFT update
+const unsigned short SAMPLES_AVG_SHIFT =    13;         // Bit shift required to average one full Sample
+const unsigned short EXTRA_BURSTS      =     8;         // Extra Burst packets to avoid overlap
+const unsigned short NUM_BURSTS        = (BURSTS_PER_AUDIO + EXTRA_BURSTS);
+const unsigned short SIZEOF_BURST      = (BURST_SAMPLES << 2);      // Number of bytes in a Burst Buffer
+
+// -- FFT Constants
+const unsigned short FFT_SAMPLES = BURST_SAMPLES * BURSTS_PER_AUDIO; // Number of samples used to do FFT.  (BURST_SAMPLES * BURSTS_PER_AUDIO)
+
+
+// ---------------------------------------------
+
 class AudioAnalyzeFFT : public AudioStream
 {
 public:
   AudioAnalyzeFFT(void);
   bool available(void);
   bool missingBlocks(void);
-  float read(unsigned short binNumber);
-  float read(unsigned short binNumber, float noiseThreshold);
-  float read(unsigned short binFirst, unsigned short binLast, float noiseThreshold);
+  float read(bool  hiRange, unsigned short binNumber);
+  float read(bool  hiRange, unsigned short binNumber, float noiseThreshold);
+  float read(bool  hiRange, unsigned short binFirst, unsigned short binLast, float noiseThreshold);
   void  setInputDivide(float divisor);
   virtual void update(void);
 
@@ -54,10 +92,15 @@ private:
   
   audio_block_t *inputQueueArray[1];
 
-  float     vReal[FFT_SAMPLES];
-  float     vImag[FFT_SAMPLES];
-  float     weights[FFT_SAMPLES];
-  arduinoFFT_float FFT;
+  float     LO_vReal[LO_FFT_SAMPLES];
+  float     LO_vImag[LO_FFT_SAMPLES];
+  float     LO_weights[LO_FFT_SAMPLES];
+  arduinoFFT_float LO_FFT;
+
+  float     HI_vReal[HI_FFT_SAMPLES];
+  float     HI_vImag[HI_FFT_SAMPLES];
+  float     HI_weights[HI_FFT_SAMPLES];
+  arduinoFFT_float HI_FFT;
 };
 
 #endif

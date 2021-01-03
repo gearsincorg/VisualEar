@@ -1,59 +1,82 @@
+/*
+
+  FFT libray
+  Copyright (C) 2010 Didier Longueville
+  Copyright (C) 2014 Enrique Condes
+  Copyright (C) 2021 Philip Malone
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+*/
+
 #include <Arduino.h>
 #include <AudioStream.h>
 #include "audioAnalyzer.h"
-
-int sampleCount = 0;
 
 AudioAnalyzeFFT::AudioAnalyzeFFT(void) : AudioStream(1, inputQueueArray),
                       state(0),
                       outputflag(false) {
                         
-  FFT = arduinoFFT_float(vReal, vImag, FFT_SAMPLES, SAMPLING_FREQ);    
-
-  // Load up the windowing weights.  Generate an array of weights based on type.
-  for (int i=0; i < FFT_SAMPLES; i++) {
-    weights[i] = 1.0;
-  }
-  FFT.Windowing(weights, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  LO_FFT = arduinoFFT_float(LO_vReal, LO_vImag, LO_weights, LO_FFT_SAMPLES, LO_SAMPLING_FREQ, FFT_WIN_TYP_HAMMING);    
+  HI_FFT = arduinoFFT_float(HI_vReal, HI_vImag, HI_weights, HI_FFT_SAMPLES, HI_SAMPLING_FREQ, FFT_WIN_TYP_HAMMING);    
 }
 
+// Return and then clear the "available" flag.
 bool AudioAnalyzeFFT::available() {
-  if (outputflag == true) {
-    outputflag = false;
-    return true;
-  }
-  return false;
+  bool temp = outputflag;
+  outputflag = false;
+  return temp;
 }
 
+// Return and then clear the "missedBlock" flag.
 bool AudioAnalyzeFFT::missingBlocks(){
-  if (missedBlock) {
-    missedBlock = false;
-    return true;
-  }
-  return false;
+  bool temp = missedBlock;
+  missedBlock = false;
+  return temp;
 }
 
+// Return the current Divide ratio
 void  AudioAnalyzeFFT::setInputDivide(float divisor){
   inputDivisor = divisor;
 }
 
+float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binNumber, float noiseThreshold) {
+  float tempVal;
 
-float AudioAnalyzeFFT::read(unsigned short binNumber, float noiseThreshold) {
-  float tempVal = vReal[binNumber];
-  if (binNumber >= FREQ_BINS) return 0;
-  if (tempVal   < noiseThreshold) return 0;
+  if (!hiRange && (binNumber < LO_FREQ_BINS)) {
+    tempVal = LO_vReal[binNumber];
+  } else if (hiRange && (binNumber < HI_FREQ_BINS)) {
+    tempVal = HI_vReal[binNumber];
+  } else {
+    tempVal = 0;
+  }
+    
+  if (tempVal < noiseThreshold) 
+    tempVal = 0;
+    
   return (tempVal);
 }
 
-float AudioAnalyzeFFT::read(unsigned short binNumber) {
-  return (read(binNumber, 0.0));
+float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binNumber) {
+  return (read(hiRange, binNumber, 0.0));
 }
 
-float AudioAnalyzeFFT::read(unsigned short binFirst, unsigned short binLast, float noiseThreshold) {
+float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binFirst, unsigned short binLast, float noiseThreshold) {
   
   float sum = 0.0;
   do {
-    sum += read(binFirst++, noiseThreshold);
+    sum += read(hiRange, binFirst++, noiseThreshold);
   } while (binFirst <= binLast);
   return sum;
 }
@@ -64,6 +87,10 @@ void AudioAnalyzeFFT::update(void)
   short *src ;
   float *dest ;
   short DCLevel;
+  short w;
+  float val;
+  
+  // unsigned long startUpdate = micros();
 
   block = receiveReadOnly();
   if (!block) {
@@ -71,6 +98,7 @@ void AudioAnalyzeFFT::update(void)
     return;
   }
 
+  // Save the latest audio block
   blocklist[state] = block;
 
   // Do we have a full audio buffer?
@@ -85,44 +113,41 @@ void AudioAnalyzeFFT::update(void)
         }
     }
     DCLevel = sum >> SAMPLES_AVG_SHIFT; 
+
+    // =============================================================
+    // Now transfer samples to both FFT reals while removing DC level
+
+    // Start with Lo range.  Take every second sample (effectively halving the sample frequency)
+    dest = LO_vReal;
+    w = 0;
     
-    // Now transfer samples to float while removeing DC level
-    dest = vReal;
-    short w = 0;
-    float val;
-    for (byte burst=0; burst < BURSTS_PER_AUDIO; burst++) {
+    for (byte burst=LO_FIRST_BURST; burst < LO_BURSTS_PER_AUDIO; burst++) {
         src = blocklist[burst]->data;
-        for (short sample = 0; sample < BURST_SAMPLES; sample++,  w++) {
-/*
-          // DEBUG !!!!!!!!
-          if (sampleCount < 500){
-            Serial.print(sampleCount);
-            Serial.print(" ");
-            Serial.print(DCLevel);
-            Serial.print(" ");
-            Serial.print(*src);
-            Serial.print(" ");
-            Serial.print(weights[w]);
-            Serial.print(" ");
-          }
-*/
-          val = ((float)(*src++ - DCLevel) * weights[w]) / inputDivisor;
+
+        for (short sample = 0; sample < BURST_SAMPLES; sample += 4,  w++) {
+          val = ((float)(*src - DCLevel) * LO_weights[w]) / inputDivisor;
           *dest++ = val;
-/*
-          if (sampleCount >  8000){
-            Serial.println(val);
-          }
-*/
-          sampleCount++;
+          src += 4;  // Skip 3 samples
+        }
+    }
+
+    // Now do the Hight range.  Take every sample of the most recent bursts.
+    dest = HI_vReal;
+    w = 0;
+    
+    for (byte burst=HI_FIRST_BURST; burst < (HI_FIRST_BURST + HI_BURSTS_PER_AUDIO); burst++) {
+        src = blocklist[burst]->data;
+
+        for (short sample = 0; sample < BURST_SAMPLES; sample += 1,  w++) {
+          val = ((float)(*src - DCLevel) * HI_weights[w]) / inputDivisor;
+          *dest++ = val;
+          src += 1;  // Next sample
         }
     }
 
     // Process the FFT
-    // Clear out imaginary values and run the FFT and then convert to magnitudes
-    memset((void *)vImag, 0, sizeof(vImag));
-    FFT.Compute(FFT_FORWARD);
-    FFT.ComplexToMagnitude();
-
+    LO_FFT.RunFFT();
+    HI_FFT.RunFFT();
     outputflag = true;
 
     // Release bursts that are being discarded
@@ -130,13 +155,17 @@ void AudioAnalyzeFFT::update(void)
       release(blocklist[i]);
     }
           
-    // slide down remaining bursts
+    // slide down the remaining bursts
     for (byte i = 0; i < (BURSTS_PER_AUDIO - BURSTS_PER_FFT_UPDATE); i++) {
       blocklist[i] = blocklist[i + BURSTS_PER_FFT_UPDATE];
     }
 
     // Update the actve burst insert point.
     state = (BURSTS_PER_AUDIO) - BURSTS_PER_FFT_UPDATE;
+
+    // Serial.print("Update Time = ");
+    // Serial.print((float)(micros() - startUpdate) / 1000.0);
+    // Serial.println(" mSec");
 
   } else {
     state++;

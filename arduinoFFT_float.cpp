@@ -1,8 +1,8 @@
 /*
-
 	FFT libray
 	Copyright (C) 2010 Didier Longueville
-	Copyright (C) 2014 Enrique Condes
+  Copyright (C) 2014 Enrique Condes
+  Copyright (C) 2021 Philip Malone
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -16,58 +16,52 @@
 
 	You should have received a copy of the GNU General Public License
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 */
 
 #include <Arduino.h>
 #include <AudioStream.h>
 #include "arduinoFFT_float.h"
 
-
-//  =================  Multi-Task Shared Data =================
-
-int8_t    nowFilling = 0;
-long   audioBuffers[NUM_BURSTS][BURST_SAMPLES]; // Storage for multiple Bursts of audio input.  Allows overlaid save and read operations.
-
-// -- FFT Data
-int8_t    windowing_type = FFT_WIN_TYP_HANN ;
-int8_t    nowProcessing = -1;
-float     vReal[FFT_SAMPLES];
-float     vImag[FFT_SAMPLES];
-float     weights[FFT_SAMPLES];
-
 //  =================  Multi-Task Shared Data =================
 
 // -- Object Constructors
-arduinoFFT_float FFT = arduinoFFT_float(vReal, vImag, FFT_SAMPLES, SAMPLING_FREQ);
+arduinoFFT_float::arduinoFFT_float(){} ;
 
-
-arduinoFFT_float::arduinoFFT_float(void)
-{
-  // empty constuctor
-}
-
-arduinoFFT_float::arduinoFFT_float(float *vReal, float *vImag, unsigned short samples, float samplingFrequency)
-{// Constructor
+// Constructor
+arduinoFFT_float::arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, float samplingFrequency, uint8_t windowType) {
 	this->_vReal = vReal;
 	this->_vImag = vImag;
+  this->_weights = weights;
 	this->_samples = samples;
 	this->_samplingFrequency = samplingFrequency;
 	this->_power = Exponent(samples);
+
+  // load up weights array 
+  for (int i=0; i < samples; i++) {
+    weights[i] = 1.0;
+  }
+  Windowing(weights, samples, windowType, FFT_FORWARD);
 }
 
-arduinoFFT_float::~arduinoFFT_float(void)
-{
 // Destructor
+arduinoFFT_float::~arduinoFFT_float(void) {
 }
 
-byte arduinoFFT_float::Revision(void)
-{
+byte arduinoFFT_float::Revision(void) {
 	return(FFT_LIB_REV);
+}
+
+void arduinoFFT_float::RunFFT(void) {
+    // Clear out imaginary values and run the FFT and then convert to magnitudes
+    
+    memset((void *)this->_vImag, 0, (this->_samples * sizeof(float)));
+    Compute(FFT_FORWARD);
+    ComplexToMagnitude();
 }
 
 void arduinoFFT_float::Compute(byte dir)
 {// Computes in-place complex-to-complex FFT /
+
 	// Reverse bits /
 	unsigned short j = 0;
 	for (unsigned short i = 0; i < (this->_samples - 1); i++) {
@@ -109,14 +103,8 @@ void arduinoFFT_float::Compute(byte dir)
 			 u2 = ((u1 * c2) + (u2 * c1));
 			 u1 = z;
 		}
-#ifdef __AVR__
-		c2 = pgm_read_float_near(&(_c2[index]));
-		c1 = pgm_read_float_near(&(_c1[index]));
-		index++;
-#else
 		c2 = sqrt((1.0 - c1) / 2.0);
 		c1 = sqrt((1.0 + c1) / 2.0);
-#endif
 		if (dir == FFT_FORWARD) {
 			c2 = -c2;
 		}
@@ -134,22 +122,6 @@ void arduinoFFT_float::ComplexToMagnitude()
 { // vM is half the size of vReal and vImag
 	for (unsigned short i = 0; i < this->_samples; i++) {
 		this->_vReal[i] = sqrt(sq(this->_vReal[i]) + sq(this->_vImag[i]));
-	}
-}
-
-void arduinoFFT_float::DCRemoval()
-{
-	// calculate the mean of vData
-	float mean = 0;
-	for (unsigned short i = 0; i < this->_samples; i++)
-	{
-		mean += this->_vReal[i];
-	}
-	mean /= this->_samples;
-	// Subtract the mean from vData
-	for (unsigned short i = 0; i < this->_samples; i++)
-	{
-		this->_vReal[i] -= mean;
 	}
 }
 
@@ -206,57 +178,6 @@ void arduinoFFT_float::Windowing(float *vData, uint16_t samples, uint8_t windowT
       vData[samples - (i + 1)] /= weighingFactor;
     }
   }
-}
-
-
-
-float arduinoFFT_float::MajorPeak()
-{
-	float maxY = 0;
-	unsigned short IndexOfMaxY = 0;
-	//If sampling_frequency = 2 * max_frequency in signal,
-	//value would be stored at position samples/2
-	for (unsigned short i = 1; i < ((this->_samples >> 1) + 1); i++) {
-		if ((this->_vReal[i-1] < this->_vReal[i]) && (this->_vReal[i] > this->_vReal[i+1])) {
-			if (this->_vReal[i] > maxY) {
-				maxY = this->_vReal[i];
-				IndexOfMaxY = i;
-			}
-		}
-	}
-	float delta = 0.5 * ((this->_vReal[IndexOfMaxY-1] - this->_vReal[IndexOfMaxY+1]) / (this->_vReal[IndexOfMaxY-1] - (2.0 * this->_vReal[IndexOfMaxY]) + this->_vReal[IndexOfMaxY+1]));
-	float interpolatedX = ((IndexOfMaxY + delta)  * this->_samplingFrequency) / (this->_samples-1);
-	if(IndexOfMaxY==(this->_samples >> 1)) //To improve calculation on edge values
-		interpolatedX = ((IndexOfMaxY + delta)  * this->_samplingFrequency) / (this->_samples);
-	// returned value: interpolated frequency peak apex
-	return(interpolatedX);
-}
-
-void arduinoFFT_float::MajorPeak(float *f, float *v)
-{
-	float maxY = 0;
-	unsigned short IndexOfMaxY = 0;
-	//If sampling_frequency = 2 * max_frequency in signal,
-	//value would be stored at position samples/2
-	for (unsigned short i = 1; i < ((this->_samples >> 1) + 1); i++) {
-		if ((this->_vReal[i - 1] < this->_vReal[i]) && (this->_vReal[i] > this->_vReal[i + 1])) {
-			if (this->_vReal[i] > maxY) {
-				maxY = this->_vReal[i];
-				IndexOfMaxY = i;
-			}
-		}
-	}
-	float delta = 0.5 * ((this->_vReal[IndexOfMaxY - 1] - this->_vReal[IndexOfMaxY + 1]) / (this->_vReal[IndexOfMaxY - 1] - (2.0 * this->_vReal[IndexOfMaxY]) + this->_vReal[IndexOfMaxY + 1]));
-	float interpolatedX = ((IndexOfMaxY + delta)  * this->_samplingFrequency) / (this->_samples - 1);
-	if (IndexOfMaxY == (this->_samples >> 1)) //To improve calculation on edge values
-		interpolatedX = ((IndexOfMaxY + delta)  * this->_samplingFrequency) / (this->_samples);
-	// returned value: interpolated frequency peak apex
-	*f = interpolatedX;
-	#if defined(ESP8266) || defined(ESP32)
-	*v = fabs(this->_vReal[IndexOfMaxY - 1] - (2.0 * this->_vReal[IndexOfMaxY]) + this->_vReal[IndexOfMaxY + 1]);
-	#else
-	*v = abs(this->_vReal[IndexOfMaxY - 1] - (2.0 * this->_vReal[IndexOfMaxY]) + this->_vReal[IndexOfMaxY + 1]);
-	#endif
 }
 
 byte arduinoFFT_float::Exponent(unsigned short value)
