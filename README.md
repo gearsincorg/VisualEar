@@ -55,7 +55,5 @@ CREDITS:
  
  > This project adapts the FFT library found here : https://github.com/kosme/arduinoFFT
  
- I have spent a lot of time optimizing the sampling, processing and display methods.  Here is how the current code runs:
  
-
  
