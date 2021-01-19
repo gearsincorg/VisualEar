@@ -34,7 +34,7 @@
 #define NUM_LO_BANDS        29                    // Number of LOW frequency bands  
 #define NUM_HI_BANDS        30                    // Number of HIGH frequency bands
 #define NUM_BANDS           59                    // Total Number of frequency bands being displayed
-#define NUM_LEDS            NUM_BANDS * 2         // Two LEDS per Band
+#define NUM_LEDS            NUM_BANDS             // One LED per Band
 #define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 #define BAND_HUE_STEP      220 / NUM_BANDS        // How much the LED Hue changes for each band.
@@ -46,13 +46,12 @@
 #define       MAX_GAIN        (NUM_LEDS - 1)
 #define       GAIN_HOLD_MS  1000
 #define       GAIN_STEP_MS   200
-#define       GAIN_UP_PIN      3
-#define       GAIN_DN_PIN      2
+#define       GAIN_BUTTON_PIN  3
 
 #define       MIN_DIVIDE        10   
 #define       MAX_DIVIDE        400  
 
-#define       BRIGHTNESS       510                    // Max overall Brightness
+#define       BRIGHTNESS       255                    // Max overall Brightness
 #define       MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
 
 #define       GAIN_ADDRESS    1
@@ -87,17 +86,22 @@ unsigned long cycleTime = 0;
 unsigned long buttonStart = 0;
 bool          adjusting   = false;
 short         gain        = 0;
-bool          gainUp      = 0;      
-bool          lastgainUp  = 0;      
-bool          gainDn      = 0;      
-bool          lastgainDn  = 0;      
-short         gainStep    = 0;      
+bool          gainHolding = false;      
+bool          gainButton  = false;      
+bool          lastGainButton  = false;      
+
+long  pressElapsed() {
+  return millis() - buttonStart;
+}
+
+void  pressReset() {
+  buttonStart = millis() ;
+}
 
 void setup() {
   Serial.begin(500000); 
 
-  pinMode(GAIN_UP_PIN, INPUT_PULLUP);
-  pinMode(GAIN_DN_PIN, INPUT_PULLUP);
+  pinMode(GAIN_BUTTON_PIN, INPUT_PULLUP);
   
   initDisplay();
   setGain(EEPROM.read(GAIN_ADDRESS));
@@ -117,9 +121,8 @@ void setup() {
 
 void  bumpGain(int step) {
   buttonStart = millis();
-  adjusting = true;
-  gainStep = step;
   setGain(gain + step);  
+  pressReset();
 }
 
 // save the current selected gain value (which LED) and calculate Amplitude divide factor
@@ -136,43 +139,52 @@ int  setGain(int newgain) {
   myFFT.setInputDivide(divide);
 
   FastLED.clear();
-  leds[gain].setHSV((gain>>1) * BAND_HUE_STEP, 255, 255);
+  leds[gain].setHSV((gain) * BAND_HUE_STEP, 255, 255);
   FastLED.show();
 
   EEPROM.write(GAIN_ADDRESS, gain);
-  return gain;
-}
 
-long  pressElapsed() {
-  return millis() - buttonStart;
+  Serial.print("Gain =");
+  Serial.println(gain);
+  return gain;
 }
 
 void loop() {
 
   // debounce
   if (pressElapsed() > 100) {
-    gainUp = !digitalRead(GAIN_UP_PIN);
-    gainDn = !digitalRead(GAIN_DN_PIN);
-    
-    if (gainUp && !lastgainUp) {
-      bumpGain(1);
+    gainButton = !digitalRead(GAIN_BUTTON_PIN);
+
+    //  Just Pressed, start the hold timer
+    if (gainButton && !lastGainButton) {
+      pressReset();
     }
-  
-    if (gainDn && !lastgainDn) {
-      bumpGain(-1);
+
+    // Look for button release.  Bump gain up unless we were already going down (holding)
+    if (!gainButton && lastGainButton) {
+      if (!gainHolding) {
+        bumpGain(1);
+      }
     }
-  
-    lastgainUp = gainUp;
-    lastgainDn = gainDn;
-  
+
+    if (gainButton) {
+      adjusting = true;
+    } else {
+      gainHolding = false;  
+    }
+
+    // 
     if (adjusting) {
       if (pressElapsed() > GAIN_HOLD_MS) {
         adjusting = false;
       }
-      else if ((gainUp || gainDn) && (pressElapsed() > GAIN_STEP_MS)) {
-        bumpGain(gainStep);
+      else if (gainButton && (pressElapsed() > GAIN_STEP_MS)) {
+        bumpGain(-1);
+        gainHolding = true;
       }
     }
+
+    lastGainButton = gainButton;
   }
   
   if (!adjusting && myFFT.available()) {
@@ -197,9 +209,8 @@ void  initDisplay(void) {
   // preload the hue into each LED and set the saturation to full and brightness to low.
   // This is a startup test to show that ALL LEDs are capable of displaying their base color.
   for (int b = 100; b >= 0; b--) {
-    for (int i = 0; i < NUM_BANDS; i++) {
-      leds[i<<1]     = CHSV(i * BAND_HUE_STEP , 255, b);
-      leds[(i<<1) + 1] = CHSV(i * BAND_HUE_STEP , 255, b);
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i]     = CHSV(i * BAND_HUE_STEP , 255, b);
     }
     delay(20);
     FastLED.show();
@@ -223,14 +234,8 @@ void  updateDisplay (void){
     if (ledBrightness > BRIGHTNESS) 
       ledBrightness = BRIGHTNESS;
   
-    // Display LED Band in the correct Hue.  Spread intensity over TWO LEDs to get 511 counts
-    if (ledBrightness <= MAX_LED_BRIGHTNESS){
-      leds[(band<<1)   ].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
-      leds[(band<<1) +1].setHSV(band * BAND_HUE_STEP, 255, 0);
-    } else {
-      leds[(band<<1)   ].setHSV(band * BAND_HUE_STEP, 255, MAX_LED_BRIGHTNESS);
-      leds[(band<<1) +1].setHSV(band * BAND_HUE_STEP, 255, ledBrightness - MAX_LED_BRIGHTNESS);
-    }
+    // Display LED Band in the correct Hue.
+    leds[band].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
   }
   
   // Update LED display
