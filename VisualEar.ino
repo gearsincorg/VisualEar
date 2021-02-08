@@ -151,6 +151,8 @@ int  setGain(int newgain) {
 
 void loop() {
 
+
+
   // debounce
   if (pressElapsed() > 100) {
     gainButton = !digitalRead(GAIN_BUTTON_PIN);
@@ -195,6 +197,12 @@ void loop() {
     lastTime = startTime;
 
     updateDisplay();
+
+    Serial.print("Mem: ");
+    Serial.print(AudioMemoryUsage());
+    Serial.print(",");
+    Serial.println(AudioMemoryUsageMax());
+
     
   } else if (myFFT.missingBlocks()) {
     toneSweep.play(1.0, 55, 19000, 6);
@@ -215,7 +223,7 @@ void  initDisplay(void) {
     delay(20);
     FastLED.show();
   }
-  delay(500);
+  delay(1000);
 }
 
 // Update the LED string based on the intensities of all the Frequency bins.

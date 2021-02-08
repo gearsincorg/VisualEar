@@ -117,17 +117,20 @@ void AudioAnalyzeFFT::update(void)
     // =============================================================
     // Now transfer samples to both FFT reals while removing DC level
 
-    // Start with Lo range.  Take every second sample (effectively halving the sample frequency)
+    // Start with Lo range.  Take every N'th sample (effectively reducing the sample frequency)
     dest = LO_vReal;
     w = 0;
     
     for (byte burst=LO_FIRST_BURST; burst < LO_BURSTS_PER_AUDIO; burst++) {
         src = blocklist[burst]->data;
 
-        for (short sample = 0; sample < BURST_SAMPLES; sample += 4,  w++) {
-          val = ((float)(*src - DCLevel) * LO_weights[w]) / inputDivisor;
-          *dest++ = val;
-          src += 4;  // Skip 3 samples
+        // Create values to process by averaging groups of samples.
+        for (short sample = 0; sample < BURST_SAMPLES; sample += LO_SAMPLE_SKIP,  w++) {
+          val = 0.0;
+          for (short s = 0; s < LO_SAMPLE_SKIP; s++) {
+            val += ((float)(*src++ - DCLevel) * LO_weights[w]) / inputDivisor;
+          }
+          *dest++ = val / LO_SAMPLE_SKIP;
         }
     }
 
