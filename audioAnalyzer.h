@@ -27,6 +27,7 @@
 #include "AudioStream.h"
 #include "arm_math.h"
 #include "arduinoFFT_float.h"
+#include "bufferManager.h"
 
 //  =================  Multi-Task Shared Data =================
 // -- Audio Constants
@@ -36,28 +37,26 @@
 #define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
 
 // Low Range Constants
-const unsigned short LO_SAMPLE_SKIP       =     4;         // How many samples to combine
+const unsigned short LO_SAMPLE_SKIP       =     6;         // How many samples to combine
 const unsigned short LO_SAMPLING_FREQ     = 44100 / LO_SAMPLE_SKIP; // Frequency at which microphone is sampled
 const unsigned short LO_FFT_SAMPLES       =  2048;        // Number of samples used to do FFT.
 const unsigned short LO_FREQ_BINS         =  LO_FFT_SAMPLES >> 1; // Number of results
-const unsigned short LO_FIRST_BURST       =    0;          // First burst in FFT source
-const unsigned short LO_BURSTS_PER_AUDIO  =    16 * LO_SAMPLE_SKIP ;
+//const unsigned short LO_BURSTS_PER_AUDIO  =    16 * LO_SAMPLE_SKIP ;
 
 // High Range Constants
 const unsigned short HI_SAMPLE_SKIP       =     1;         // How many samples to combine
 const unsigned short HI_SAMPLING_FREQ     = 44100 / HI_SAMPLE_SKIP; // Frequency at which microphone is sampled
 const unsigned short HI_FFT_SAMPLES       =  2048;        // Number of samples used to do FFT. 
 const unsigned short HI_FREQ_BINS         =  HI_FFT_SAMPLES >> 1; // Number of results
-const unsigned short HI_FIRST_BURST       =    48;        // First burst in FFT source
-const unsigned short HI_BURSTS_PER_AUDIO  =    16 * HI_SAMPLE_SKIP ; 
+//const unsigned short HI_BURSTS_PER_AUDIO  =    16 * HI_SAMPLE_SKIP ; 
 
 // Audio Sample constants
 const unsigned short BURST_SAMPLES     =   128;         // Number of audio samples taken in one "Burst"
-const unsigned short BURSTS_PER_AUDIO  =    LO_BURSTS_PER_AUDIO;         // Number of Burst Buffers used to create a single Audio Packet
+//const unsigned short BURSTS_PER_AUDIO  =    LO_BURSTS_PER_AUDIO;         // Number of Burst Buffers used to create a single Audio Packet
 const unsigned short BURSTS_PER_FFT_UPDATE = 4;         // Number of Burst received before doing an FFT update
-const unsigned short SAMPLES_AVG_SHIFT =    13;         // Bit shift required to average one full Sample
-const unsigned short EXTRA_BURSTS      =    16;         // Extra Burst packets to avoid overlap
-const unsigned short NUM_BURSTS        = (BURSTS_PER_AUDIO + EXTRA_BURSTS);
+//const unsigned short SAMPLES_AVG_SHIFT =    13;         // Bit shift required to average one full Sample
+//const unsigned short EXTRA_BURSTS      =    16;         // Extra Burst packets to avoid overlap
+const unsigned short NUM_BURSTS        = 8;
 const unsigned short SIZEOF_BURST      = (BURST_SAMPLES << 2);      // Number of bytes in a Burst Buffer
 
 // ---------------------------------------------
@@ -71,7 +70,7 @@ public:
   float read(bool  hiRange, unsigned short binNumber);
   float read(bool  hiRange, unsigned short binNumber, float noiseThreshold);
   float read(bool  hiRange, unsigned short binFirst, unsigned short binLast, float noiseThreshold);
-  void  setInputDivide(float divisor);
+  void  setInputScale(float scale);
   virtual void update(void);
 
   ushort output[512] __attribute__ ((aligned (4)));
@@ -80,24 +79,31 @@ private:
   void init(void);
   void copy_to_fft_buffer(void *destination, const void *source);
   
-  audio_block_t *blocklist[BURSTS_PER_AUDIO];
+  //audio_block_t *blocklist[BURSTS_PER_AUDIO];
   short buffer[2048] __attribute__ ((aligned (4)));
-  float inputDivisor = 256;
-  byte state;
+  float inputScale;
   volatile bool outputflag;
   volatile bool missedBlock;
+  unsigned short state;
   
   audio_block_t *inputQueueArray[1];
 
+  short     LO_short[LO_FFT_SAMPLES];
   float     LO_vReal[LO_FFT_SAMPLES];
   float     LO_vImag[LO_FFT_SAMPLES];
   float     LO_weights[LO_FFT_SAMPLES];
-  arduinoFFT_float LO_FFT;
 
+  arduinoFFT_float LO_FFT;
+  BufferManager    LO_Buffer;
+
+  short     HI_short[LO_FFT_SAMPLES];
   float     HI_vReal[HI_FFT_SAMPLES];
   float     HI_vImag[HI_FFT_SAMPLES];
   float     HI_weights[HI_FFT_SAMPLES];
+  
   arduinoFFT_float HI_FFT;
+  BufferManager    HI_Buffer;
+
 };
 
 #endif

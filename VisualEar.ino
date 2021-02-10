@@ -31,9 +31,9 @@
 #include "FastLED.h"
 
 // -- LED Display Constants
-#define NUM_LO_BANDS        29                    // Number of LOW frequency bands  
-#define NUM_HI_BANDS        30                    // Number of HIGH frequency bands
-#define NUM_BANDS           59                    // Total Number of frequency bands being displayed
+#define NUM_LO_BANDS        41                    // Number of LOW frequency bands  
+#define NUM_HI_BANDS        63                    // Number of HIGH frequency bands
+#define NUM_BANDS           (NUM_LO_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed
 #define NUM_LEDS            NUM_BANDS             // One LED per Band
 #define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
@@ -42,50 +42,46 @@
 #define LED_DATA_PIN        12
 #define LED_CLOCK_PIN       14
 
-#define       MIN_GAIN         0
-#define       MAX_GAIN        (NUM_LEDS - 1)
-#define       GAIN_HOLD_MS  1000
-#define       GAIN_STEP_MS   200
-#define       GAIN_BUTTON_PIN  3
+#define GAIN_HOLD_MS      1000
+#define GAIN_STEP_MS       200
+#define GAIN_BUTTON_PIN      3
 
-#define       MIN_DIVIDE        10   
-#define       MAX_DIVIDE        400  
+#define BRIGHTNESS         255                  // Max overall Brightness
+#define MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
 
-#define       BRIGHTNESS       255                    // Max overall Brightness
-#define       MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
-
-#define       GAIN_ADDRESS    1
+#define GAIN_ADDRESS         1
 
 const int myInput = AUDIO_INPUT_LINEIN;
 //const int myInput = AUDIO_INPUT_MIC;
 
+const int MIN_GAIN_NUM   =   0;
+const int MAX_GAIN_NUM   =  (NUM_LEDS - 1);
+const int GAIN_RANGE     =  (MAX_GAIN_NUM - MIN_GAIN_NUM);
+
+const double MIN_GAIN_SCALE  = 0.00125;
+const double MAX_GAIN_SCALE  = 0.2;   
+const double GAIN_SCALE      = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
+
 // -- LED Display Data
 CRGB      leds[NUM_LEDS];
 uint32_t  bandValues[NUM_BANDS];
-uint16_t  LO_bandBins[NUM_LO_BANDS + 1] = {10,11,12,13,14,16,18,19,21,24,26,29,32,35,39,43,47,52,58,64,71,78,86,95,105,116,128,141,156,172};
-uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {43,47,52,58,64,71,78,86,95,105,116,128,141,156,172,190,210,231,256,282,312,344,380,419,463,511,564,623,688,760,839};
+uint16_t  LO_bandBins[NUM_LO_BANDS + 1] = {11,12,13,14,15,16,17,18,19,20,21,22,24,25,27,28,30,32,33,35,38,40,42,45,47,50,53,56,60,63,67,71,75,80,84,89,95,100,106,112,119,126};
+uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {21,22,24,25,27,28,30,32,33,35,37,40,42,45,47,50,53,56,60,63,67,71,75,79,84,89,94,100,106,112,119,126,134,142,150,159,168,178,189,200,212,225,238,252,267,283,300,318,337,357,378,400,424,449,476,504,534,566,600,636,673,713,756,801};
 
 // Create the Audio components.  These should be created in the
-// order data flows, inputs/sources -> processing -> outputs
 AudioInputI2S          audioInput;     // audio shield: mic or line-in
-AudioSynthToneSweep    toneSweep;      // audio input to sweep frequency
-AudioSynthWaveformSine sinewave;       // Standard Sine wave output
-
 AudioAnalyzeFFT        myFFT;
 
 // Connect either the live input or synthesized sine wave
 AudioConnection patchCord1(audioInput, 0, myFFT, 0);
-// AudioConnection patchCord1(sinewave, 0, myFFT, 0);
-// AudioConnection patchCord1(toneSweepLog, 0, myFFT, 0);
 
 unsigned long startTime = millis();
 unsigned long lastTime = millis();
 unsigned long cycleTime = 0;
 
-
 unsigned long buttonStart = 0;
 bool          adjusting   = false;
-short         gain        = 0;
+short         gainNumber  = 0;
 bool          gainHolding = false;      
 bool          gainButton  = false;      
 bool          lastGainButton  = false;      
@@ -102,57 +98,56 @@ void setup() {
   Serial.begin(500000); 
 
   pinMode(GAIN_BUTTON_PIN, INPUT_PULLUP);
+
+  // Audio connections require memory to work.  For more
+  AudioMemory(NUM_BURSTS);
   
   initDisplay();
   setGain(EEPROM.read(GAIN_ADDRESS));
-
-  // Audio connections require memory to work.  For more
-  // detailed information, see the MemoryAndCpuUsage example
-  AudioMemory(NUM_BURSTS);
+  delay(500);
 
   // Create a synthetic frequency sweep
   // toneSweep.play(0.01, 55, 19000, 100);
   // toneSweepLog.play(0.01, 55, 19000, 6);
 
   // Create a synthetic sine wave
-  sinewave.amplitude(1.0);
-  sinewave.frequency(16000);
+  //sinewave.amplitude(1.0);
+  //sinewave.frequency(16000);
+
 }
 
 void  bumpGain(int step) {
   buttonStart = millis();
-  setGain(gain + step);  
+  setGain(gainNumber + step);  
   pressReset();
 }
 
 // save the current selected gain value (which LED) and calculate Amplitude divide factor
 int  setGain(int newgain) {
-  double  divide;
+  double  gainScale;
 
-  if (newgain < MIN_GAIN)
-    newgain = MIN_GAIN;
-  else if (newgain > MAX_GAIN)
-    newgain = MAX_GAIN;
+  if (newgain < MIN_GAIN_NUM)
+    newgain = MIN_GAIN_NUM;
+  else if (newgain > MAX_GAIN_NUM)
+    newgain = MAX_GAIN_NUM;
 
-  gain = newgain;
-  divide = MIN_DIVIDE + ((MAX_DIVIDE - MIN_DIVIDE) * (MAX_GAIN - gain) / MAX_GAIN) ;
-  myFFT.setInputDivide(divide);
+  gainNumber = newgain;
+  EEPROM.write(GAIN_ADDRESS, gainNumber);
+
+  gainScale  = MIN_GAIN_SCALE * pow(GAIN_SCALE, gainNumber);
+  myFFT.setInputScale(gainScale);
 
   FastLED.clear();
-  leds[gain].setHSV((gain) * BAND_HUE_STEP, 255, 255);
+  leds[gainNumber].setHSV((gainNumber) * BAND_HUE_STEP, 255, 255);
   FastLED.show();
-
-  EEPROM.write(GAIN_ADDRESS, gain);
-
+  
   Serial.print("Gain =");
-  Serial.println(gain);
-  return gain;
+  Serial.println(gainNumber);
+  
+  return gainNumber;
 }
 
 void loop() {
-
-
-
   // debounce
   if (pressElapsed() > 100) {
     gainButton = !digitalRead(GAIN_BUTTON_PIN);
@@ -198,14 +193,9 @@ void loop() {
 
     updateDisplay();
 
-    Serial.print("Mem: ");
-    Serial.print(AudioMemoryUsage());
-    Serial.print(",");
-    Serial.println(AudioMemoryUsageMax());
-
-    
-  } else if (myFFT.missingBlocks()) {
-    toneSweep.play(1.0, 55, 19000, 6);
+    // Serial.print("Cycle= ");
+    // Serial.print(cycleTime);
+    // Serial.println(" mSec");
   }
 }
 
@@ -223,7 +213,7 @@ void  initDisplay(void) {
     delay(20);
     FastLED.show();
   }
-  delay(1000);
+  delay(100);
 }
 
 // Update the LED string based on the intensities of all the Frequency bins.
@@ -232,7 +222,7 @@ void  updateDisplay (void){
 
   // Allocate FFT results into LED Bands (
   fillBands ();
-  
+
   // Process the LED buckets into LED Intensities
   for (byte band = 0; band < NUM_BANDS; band++) {
     
