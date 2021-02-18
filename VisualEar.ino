@@ -122,6 +122,10 @@ void  bumpGain(int step) {
   pressReset();
 }
 
+int flipLEDs(int num) {
+  return (NUM_LEDS - num - 1);
+}
+
 // save the current selected gain value (which LED) and calculate Amplitude divide factor
 int  setGain(int newgain) {
   double  gainScale;
@@ -138,7 +142,7 @@ int  setGain(int newgain) {
   myFFT.setInputScale(gainScale);
 
   FastLED.clear();
-  leds[gainNumber].setHSV((gainNumber) * BAND_HUE_STEP, 255, 255);
+  leds[flipLEDs(gainNumber)].setHSV((gainNumber) * BAND_HUE_STEP, 255, 255);
   FastLED.show();
   
   Serial.print("Gain =");
@@ -208,7 +212,7 @@ void  initDisplay(void) {
   // This is a startup test to show that ALL LEDs are capable of displaying their base color.
   for (int b = 100; b >= 0; b--) {
     for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i]     = CHSV(i * BAND_HUE_STEP , 255, b);
+      leds[flipLEDs(i)] = CHSV(i * BAND_HUE_STEP , 255, b);
     }
     delay(20);
     FastLED.show();
@@ -233,7 +237,7 @@ void  updateDisplay (void){
       ledBrightness = BRIGHTNESS;
   
     // Display LED Band in the correct Hue.
-    leds[band].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
+    leds[flipLEDs(band)].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
   }
   
   // Update LED display

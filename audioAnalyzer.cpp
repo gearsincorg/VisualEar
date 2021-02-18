@@ -85,7 +85,7 @@ void AudioAnalyzeFFT::update(void)
   audio_block_t *block;
   short *src ;
   
-  unsigned long startUpdate = micros();
+  // unsigned long startUpdate = micros();
 
   block = receiveReadOnly();
   if (!block) {
