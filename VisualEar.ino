@@ -26,15 +26,12 @@
 #include <SerialFlash.h>
 #include <EEPROM.h>
 #include "audioAnalyzer.h"
+#include "devconf.h"
 
 #define  FASTLED_INTERNAL
 #include "FastLED.h"
 
 // -- LED Display Constants
-#define NUM_LO_BANDS        41                    // Number of LOW frequency bands  
-#define NUM_HI_BANDS        63                    // Number of HIGH frequency bands
-#define NUM_BANDS           (NUM_LO_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed
-#define NUM_LEDS            NUM_BANDS             // One LED per Band
 #define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 #define BAND_HUE_STEP      220 / NUM_BANDS        // How much the LED Hue changes for each band.
@@ -46,7 +43,6 @@
 #define GAIN_STEP_MS       200
 #define GAIN_BUTTON_PIN      3
 
-#define BRIGHTNESS         255                  // Max overall Brightness
 #define MAX_LED_BRIGHTNESS 255                  // Max LED Brightness
 
 #define GAIN_ADDRESS         1
@@ -72,7 +68,7 @@ uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {21,22,24,25,27,28,30,32,33,35,37,40,4
 AudioInputI2S          audioInput;     // audio shield: mic or line-in
 AudioAnalyzeFFT        myFFT;
 
-// Connect either the live input or synthesized sine wave
+// Connect the live input
 AudioConnection patchCord1(audioInput, 0, myFFT, 0);
 
 unsigned long startTime = millis();
@@ -105,15 +101,6 @@ void setup() {
   initDisplay();
   setGain(EEPROM.read(GAIN_ADDRESS));
   delay(500);
-
-  // Create a synthetic frequency sweep
-  // toneSweep.play(0.01, 55, 19000, 100);
-  // toneSweepLog.play(0.01, 55, 19000, 6);
-
-  // Create a synthetic sine wave
-  //sinewave.amplitude(1.0);
-  //sinewave.frequency(16000);
-
 }
 
 void  bumpGain(int step) {
@@ -196,10 +183,6 @@ void loop() {
     lastTime = startTime;
 
     updateDisplay();
-
-    // Serial.print("Cycle= ");
-    // Serial.print(cycleTime);
-    // Serial.println(" mSec");
   }
 }
 
@@ -233,8 +216,8 @@ void  updateDisplay (void){
     // Scale the bars for the display
     ledBrightness = bandValues[band];
 
-    if (ledBrightness > BRIGHTNESS) 
-      ledBrightness = BRIGHTNESS;
+    if (ledBrightness > MAX_LED_BRIGHTNESS) 
+      ledBrightness = MAX_LED_BRIGHTNESS;
   
     // Display LED Band in the correct Hue.
     leds[flipLEDs(band)].setHSV(band * BAND_HUE_STEP, 255, ledBrightness);
