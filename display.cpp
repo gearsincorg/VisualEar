@@ -78,8 +78,9 @@ void  initFFTDisplay(int numberBands) {
 
 
 // Update the LED string based on the intensities of all the Frequency bins.
-void  updateFFTDisplay (uint32_t * bandValues){
+int  updateFFTDisplay (uint32_t * bandValues){
   uint16_t ledBrightness;
+  int      overLimitCount = 0;
 
   // Process the LED buckets into LED Intensities
   for (byte band = 0; band < numBands; band++) {
@@ -87,8 +88,10 @@ void  updateFFTDisplay (uint32_t * bandValues){
     // Scale the bars for the display
     ledBrightness = bandValues[band];
 
-    if (ledBrightness > MAX_LED_BRIGHTNESS) 
+    if (ledBrightness > MAX_LED_BRIGHTNESS)  {
       ledBrightness = MAX_LED_BRIGHTNESS;
+      overLimitCount++;
+    }
   
     // Display LED Band in the correct Hue.
     setLEDBand(band, band, ledBrightness);
@@ -96,6 +99,7 @@ void  updateFFTDisplay (uint32_t * bandValues){
   
   // Update LED display
   FastLED.show();
+  return (overLimitCount);
 }
 
 // ======================================================================================================
@@ -128,18 +132,21 @@ void  initBallDisplay(int numberBands) {
   lastMoveMs = millis();
 }
 
-void  updateBallDisplay (uint32_t * bandValues){
+int updateBallDisplay (uint32_t * bandValues){
     // see if we need to add some new balls.
-    addBalls(bandValues);
+    int OLC = addBalls(bandValues);
   
     // Update LED display
     displayBalls();
     moveBalls();
+
+    return (OLC);
 }
 
-void  addBalls(uint32_t * bandValues){
+int  addBalls(uint32_t * bandValues){
     uint32_t val;
     double   velocity;
+    int      overLimitCount = 0;
     
     for (int b = 0; b < numBands; b++ ){
       val = bandValues[b];
@@ -149,15 +156,10 @@ void  addBalls(uint32_t * bandValues){
       
       if (val > BALL_THRESHOLD) {
         velocity = (double)val / 100.0;
-        Serial.print(b);
-        Serial.print(": ");
-        Serial.print(velocity);
         addBall(velocity, b);
       }
     }
-    Serial.print(" ");
-    Serial.print(nextBall);
-    Serial.println("------------------");
+    return (overLimitCount);
 }
 
 void  addBall(float avel, int  aband) {
@@ -166,7 +168,6 @@ void  addBall(float avel, int  aband) {
     if (nextBall < MAX_BALLS) {
 
       if (numBalls[aband] < MAX_BAND_BALLS) {
-        Serial.println(" Yes ");
         pos[nextBall] = 0;
         vel[nextBall] = avel;
         band[nextBall] = aband;
@@ -174,7 +175,6 @@ void  addBall(float avel, int  aband) {
         numBalls[aband]++;
         nextBall++;
       } else {
-        Serial.println(" No ");
       }
     }
 }
@@ -191,25 +191,13 @@ void  moveBalls() {
       pos[ball] += (halfATSquared + (vel[ball] * elapsed)); 
       vel[ball] += deltaV  ;
 
-      Serial.print(pos[ball]);
-      Serial.print(" ");
-
       // has the ball hit the ground?
       if (pos[ball] <= 0) {
 
-        Serial.print(" [Remove ");
-        Serial.print(ball);
-        Serial.print(" count ");
-        Serial.print(numBalls[band[ball]]);
-        Serial.print(" ->   ");
-        
         // remove this ball and move all others down.
         nextBall--;
         numBalls[band[ball]]--;
         
-        Serial.print(numBalls[band[ball]]);
-        Serial.print("] ");
-
         for (int b = ball; b < nextBall; b++) {
           pos[b] = pos[b+1];
           vel[b] = vel[b+1];
@@ -217,8 +205,6 @@ void  moveBalls() {
         }
       }
     }
-    Serial.println("");
-
     lastMoveMs =tnow;
 }
 

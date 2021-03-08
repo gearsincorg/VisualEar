@@ -46,9 +46,11 @@ const int myInput = AUDIO_INPUT_LINEIN;
 const int MIN_GAIN_NUM   =   0;
 const int MAX_GAIN_NUM   =  (NUM_LEDS - 1);
 const int GAIN_RANGE     =  (MAX_GAIN_NUM - MIN_GAIN_NUM);
+float     upGainAccumulator   = 0;
+float     downGainAccumulator = 0;
 
 const double MIN_GAIN_SCALE  = 0.00125;
-const double MAX_GAIN_SCALE  = 0.2;   
+const double MAX_GAIN_SCALE  = 0.1;  // was 2 
 const double GAIN_SCALE      = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
 
 // -- LED Display Data
@@ -73,7 +75,9 @@ short         gainNumber  = 0;
 bool          gainHolding = false;      
 bool          gainButton  = false;      
 bool          lastGainButton  = false;      
+double        gainScale;
 
+int           OLC = 0;
 
 // ==================================================================================================
 
@@ -86,7 +90,8 @@ void setup() {
   AudioMemory(NUM_BURSTS);
   
   initBallDisplay(NUM_BANDS);
-  setGain(EEPROM.read(GAIN_ADDRESS));
+//  initFFTDisplay(NUM_BANDS);
+  setGain(EEPROM.read(GAIN_ADDRESS), true);
   delay(500);
 }
 
@@ -103,7 +108,7 @@ void loop() {
     // Look for button release.  Bump gain up unless we were already going down (holding)
     if (!gainButton && lastGainButton) {
       if (!gainHolding) {
-        bumpGain(1);
+        bumpGain(1, true);
       }
     }
 
@@ -113,17 +118,15 @@ void loop() {
       gainHolding = false;  
     }
 
-    // 
     if (adjusting) {
       if (pressElapsed() > GAIN_HOLD_MS) {
         adjusting = false;
       }
       else if (gainButton && (pressElapsed() > GAIN_STEP_MS)) {
-        bumpGain(-1);
+        bumpGain(-1, true);
         gainHolding = true;
       }
     }
-
     lastGainButton = gainButton;
   }
   
@@ -135,7 +138,8 @@ void loop() {
     lastTime = startTime;
 
     fillBands();
-    updateBallDisplay(bandValues);
+    // runAGC(updateFFTDisplay(bandValues));
+    runAGC(updateBallDisplay(bandValues));
   }
 }
 
@@ -149,15 +153,47 @@ void  pressReset() {
   buttonStart = millis() ;
 }
 
-void  bumpGain(int step) {
+void  runAGC(int unused){
+  float OCR = (float)OLC / (float)NUM_BANDS;
+
+  if (OCR < 0.04) {
+    upGainAccumulator += 0.01;
+  } else if (OCR > 0.45) {
+    upGainAccumulator -= 0.04;
+  }
+
+  if (upGainAccumulator > 1.0) {
+    bumpGain(1, false);
+    upGainAccumulator = 0.0;
+  } else if (upGainAccumulator < -1.0) {
+    bumpGain(-1, false);
+    upGainAccumulator = 0.0;
+  }
+
+  /*  
+  Serial.print("AGC OLC ");
+  Serial.print(OLC);
+  Serial.print(", OCR ");
+  Serial.print(OCR);
+  Serial.print(", UA ");
+  Serial.print(upGainAccumulator);
+  Serial.print(", Gain Number ");
+  Serial.println(gainNumber);
+  */
+
+  Serial.print(upGainAccumulator);
+  Serial.print(" 1 -1 ");
+  Serial.println(gainScale * 10);
+  }
+
+void  bumpGain(int step, boolean displayGain ) {
   buttonStart = millis();
-  setGain(gainNumber + step);  
+  setGain(gainNumber + step, displayGain);  
   pressReset();
 }
 
 // save the current selected gain value (which LED) and calculate Amplitude divide factor
-int  setGain(int newgain) {
-  double  gainScale;
+int  setGain(int newgain, boolean displayGain) {
 
   if (newgain < MIN_GAIN_NUM)
     newgain = MIN_GAIN_NUM;
@@ -170,12 +206,14 @@ int  setGain(int newgain) {
   gainScale  = MIN_GAIN_SCALE * pow(GAIN_SCALE, gainNumber);
   myFFT.setInputScale(gainScale);
 
-  FastLED.clear();
-  setLEDBand(gainNumber, gainNumber, MAX_LED_BRIGHTNESS);
-  FastLED.show();
-  
-  Serial.print("Gain =");
-  Serial.println(gainNumber);
+  if (displayGain) {
+    FastLED.clear();
+    setLEDBand(gainNumber, gainNumber, MAX_LED_BRIGHTNESS);
+    FastLED.show();
+  }
+    
+//  Serial.print("Gain =");
+//  Serial.println(gainNumber);
   
   return gainNumber;
 }
@@ -194,10 +232,13 @@ void  fillBands (void){
   // Cycle through each of the LED bands.  Set initial noise threshold high and drop down.
   noiseFloor = START_NOISE_FLOOR;
   band = 0;
+  OLC = 0;
     
   for (int b = 0; b < NUM_LO_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
     bandValues[band] = (uint32_t)myFFT.read(false, LO_bandBins[b], LO_bandBins[b+1], noiseFloor);
+    if (bandValues[band] > 2)
+      OLC++;
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
@@ -208,6 +249,8 @@ void  fillBands (void){
   for (int b = 0; b < NUM_HI_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
     bandValues[band] = (uint32_t)myFFT.read(true, HI_bandBins[b], HI_bandBins[b+1], noiseFloor);
+    if (bandValues[band] > 2)
+      OLC++;
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
