@@ -25,6 +25,67 @@ float     vel[MAX_BALLS];
 uint8_t   band[MAX_BALLS];
 
 uint8_t   numBalls[NUM_BANDS];
+short     displayMode; 
+uint32_t  modeChangeRelease = 0;
+
+double    gainSlope = 1.0;
+double    minScale  = 0.0;
+
+// ======================================================================================================
+// Generic Display Functions
+// ======================================================================================================
+void  setDisplayMode(short  mode) {
+  displayMode = mode;    
+}
+
+short  getDisplayMode() {
+  return(displayMode);    
+}
+
+short  switchDisplayMode() {
+  displayMode = (short)((displayMode + 1 ) % NUM_MODES);
+  modeChangeRelease = millis() + MODE_CHANGE_PAUSE;
+  showMode();
+  return (displayMode);
+}
+
+void  initDisplay(){
+
+  delay(250);      // sanity check delay
+  FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
+  FastLED.clear();
+  
+  switch (displayMode) {
+    case 0:
+      break;
+    
+    case 1:
+      initFFTDisplay(NUM_BANDS);
+      break;
+
+    case 2:
+      initBallDisplay(NUM_BANDS);
+      break;
+  }
+}
+
+void  updateDisplay(uint32_t * bandValues) {
+  // display the data in the selected way.
+  if (millis() > modeChangeRelease) {
+    switch (displayMode) {
+      case 0:
+        break;
+      
+      case 1:
+        updateFFTDisplay(bandValues);
+        break;
+  
+      case 2:
+        updateBallDisplay(bandValues);
+        break;
+    }
+  }
+}
 
 // ======================================================================================================
 // trajectory functions
@@ -51,6 +112,14 @@ void  setLED(int pos, int hue, int intensity) {
   }
 }
 
+void  showMode () {
+  FastLED.clearData();
+  FastLED.show();
+  for (int I = 0; I < displayMode; I++) {
+    setLEDBand(I * 2, I * 4, MAX_LED_BRIGHTNESS); 
+  }
+  FastLED.show();
+}
 
 // ======================================================================================================
 //  FFT display functions
@@ -58,30 +127,22 @@ void  setLED(int pos, int hue, int intensity) {
 
 // Configure the LED string and preload the color values for each band.
 void  initFFTDisplay(int numberBands) {
+
+  const double MIN_GAIN_SCALE  = 0.00125;
+  const double MAX_GAIN_SCALE  = 0.2; 
+  
+  minScale       = MIN_GAIN_SCALE;   
+  gainSlope      = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
+  
   numBands = numberBands;
   hueStep = 220.0 / numBands;   // How much the LED Hue changes for each step.
-
-  delay(250);      // sanity check delay
-  FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
-
-  // preload the hue into each LED and set the saturation to full and brightness to low.
-  // This is a startup test to show that ALL LEDs are capable of displaying their base color.
-  for (int b = 100; b >= 0; b--) {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      setLEDBand(i, i, b);
-    }
-    FastLED.show();
-    delay(20);
-  }
-  delay(100);
 }
 
 
 // Update the LED string based on the intensities of all the Frequency bins.
-int  updateFFTDisplay (uint32_t * bandValues){
+void  updateFFTDisplay (uint32_t * bandValues){
   uint16_t ledBrightness;
-  int      overLimitCount = 0;
-
+  
   // Process the LED buckets into LED Intensities
   for (byte band = 0; band < numBands; band++) {
     
@@ -90,7 +151,6 @@ int  updateFFTDisplay (uint32_t * bandValues){
 
     if (ledBrightness > MAX_LED_BRIGHTNESS)  {
       ledBrightness = MAX_LED_BRIGHTNESS;
-      overLimitCount++;
     }
   
     // Display LED Band in the correct Hue.
@@ -99,7 +159,6 @@ int  updateFFTDisplay (uint32_t * bandValues){
   
   // Update LED display
   FastLED.show();
-  return (overLimitCount);
 }
 
 // ======================================================================================================
@@ -111,42 +170,31 @@ void  initBallDisplay(int numberBands) {
   numBands = numberBands;
   hueStep = 220.0 / numBands;   // How much the LED Hue changes for each step.
 
-  delay(250);      // sanity check delay
-  FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
+  const double MIN_GAIN_SCALE  = 0.00125;
+  const double MAX_GAIN_SCALE  = 0.05;
+  
+  minScale       = MIN_GAIN_SCALE;   
+  gainSlope      = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
 
   // initialize ball data;
   memset(pos, 0, sizeof(pos));
   memset(vel, 0, sizeof(vel));
   memset(band, 0, sizeof(band));
   memset(numBalls, 0, sizeof(numBalls));
-  
-  // Bounce a white LED up and back
-  // This is a startup test to show that ALL LEDs are capable of displaying their base color.
-  for (int b = 100; b >= 0; b--) {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      setLED(i, i, b);
-    }
-    delay(20);
-    FastLED.show();
-  }
-  lastMoveMs = millis();
 }
 
-int updateBallDisplay (uint32_t * bandValues){
+void updateBallDisplay (uint32_t * bandValues){
     // see if we need to add some new balls.
-    int OLC = addBalls(bandValues);
+    addBalls(bandValues);
   
     // Update LED display
     displayBalls();
     moveBalls();
-
-    return (OLC);
 }
 
-int  addBalls(uint32_t * bandValues){
+void  addBalls(uint32_t * bandValues){
     uint32_t val;
     double   velocity;
-    int      overLimitCount = 0;
     
     for (int b = 0; b < numBands; b++ ){
       val = bandValues[b];
@@ -159,7 +207,6 @@ int  addBalls(uint32_t * bandValues){
         addBall(velocity, b);
       }
     }
-    return (overLimitCount);
 }
 
 void  addBall(float avel, int  aband) {
