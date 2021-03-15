@@ -54,9 +54,11 @@ uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {21,22,24,25,27,28,30,32,33,35,37,40,4
 // Create the Audio components.  These should be created in the
 AudioInputI2S          audioInput;     // audio shield: mic or line-in
 AudioAnalyzeFFT        myFFT;
+AudioAnalyzePeak       peak;          //xy=393,385
 
 // Connect the live input
 AudioConnection patchCord1(audioInput, 0, myFFT, 0);
+AudioConnection patchCord2(audioInput, 0, peak, 0);
 
 unsigned long startTime = millis();
 unsigned long lastTime = millis();
@@ -72,7 +74,6 @@ int           activeBands = 0;
 
 // Non Volatile values
 short         gainNumber  = 0;
-
 
 // ==================================================================================================
 
@@ -93,18 +94,24 @@ void setup() {
 }
 
 void loop() {
-  // check the button and see if we have a chenge
+  // check the button and see if we have a change
   runUI();
-      
-  if (myFFT.available()) {
-    // each time new FFT data is available update the diplay
-    startTime = millis();
-    cycleTime = startTime - lastTime;
-    lastTime = startTime;
 
-    fillBands();
-    updateDisplay(bandValues);
-    runAGC();
+  if (getDisplayMode() == 1) {       
+    if (peak.available()){
+      updateVuDisplay(peak.readPeakToPeak());
+    }
+  } else {       
+    if (myFFT.available()) {
+      // each time new FFT data is available update the diplay
+      startTime = millis();
+      cycleTime = startTime - lastTime;
+      lastTime = startTime;
+  
+      fillBands();
+      updateDisplay(bandValues);
+      runAGC();
+    }
   }
 }
 
@@ -143,9 +150,9 @@ void  pressReset() {
 void  runAGC(){
   float OCR = (float)activeBands / (float)NUM_BANDS;
 
-  if (OCR < 0.04) {
+  if (OCR < lowTrip) {
     upGainAccumulator += 0.01;
-  } else if (OCR > 0.45) {
+  } else if (OCR > highTrip) {
     upGainAccumulator -= 0.04;
   }
 
@@ -170,6 +177,7 @@ void  runAGC(){
 
   Serial.print(upGainAccumulator);
   Serial.print(" 1 -1 ");
+  Serial.println((float)gainNumber / 10.0);
   }
 
 void  bumpGain(int step ) {
@@ -185,7 +193,7 @@ void  bumpMode() {
 }
 
 // save the current selected gain value (which LED) and calculate Amplitude divide factor
-int  setGain(int newgain) {
+int  setGain(short newgain) {
 double        gainScale;
 
   if (newgain < MIN_GAIN_NUM)
