@@ -37,7 +37,7 @@
 #define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
 
 // Low Range Constants
-const unsigned short LO_SAMPLE_SKIP       =     6;         // How many samples to combine
+const unsigned short LO_SAMPLE_SKIP       =    6;         // How many samples to combine
 const unsigned short LO_SAMPLING_FREQ     = 44100 / LO_SAMPLE_SKIP; // Frequency at which microphone is sampled
 const unsigned short LO_FFT_SAMPLES       =  2048;        // Number of samples used to do FFT.
 const unsigned short LO_FREQ_BINS         =  LO_FFT_SAMPLES >> 1; // Number of results

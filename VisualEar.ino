@@ -175,9 +175,6 @@ void  runAGC(){
   Serial.println(gainNumber);
   */
 
-  Serial.print(upGainAccumulator);
-  Serial.print(" 1 -1 ");
-  Serial.println((float)gainNumber / 10.0);
   }
 
 void  bumpGain(int step ) {
