@@ -1,7 +1,7 @@
 Visual Ear project
 By Phil Malone
 Phil.Malone@Mr-Phil.com
-11/24/2020
+6/21/2021
 
 https://hackaday.io/project/175944-the-visual-ear 
  
@@ -23,11 +23,11 @@ https://hackaday.io/project/175944-the-visual-ear
 
 Display Specs:
 
-- Display Bands:  59 Bands, spanning 55 Hz - 17163 Hz (8.25 Octaves)
-- Intensity Range: Each Band is displayed with a secific color, and 512 intensity levels (Using 2 LEDS per band)
+- Display Bands:  104 Bands, spanning 43 Hz - 16744 Hz (8.5 Octaves)
+- Intensity Range: Each Band is displayed with a secific color, and 255 intensity levels
 - Display Update interval: 11.6 mSec (86 Hz)
 - Audio to Visual Latency:  Max 13.5 mSec (11.6 mSec acquisition + 1.9 mSec for dual FFT & display)
-- Visual Persistance:  Low Frequency (<800 Hz) 185 mSec.  High Frequency (> 880 Hz) 46 mSec.
+- Visual Persistance:  Low Frequency (< 440 Hz) 185 mSec.  High Frequency (>= 440 Hz) 46 mSec.
 
  ** HOW IT WORKS 
  
