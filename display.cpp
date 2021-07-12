@@ -144,9 +144,9 @@ void  showMode () {
 void  initFFTDisplay(int numberBands) {
 
   const double MIN_GAIN_SCALE  = 0.00125;
-  const double MAX_GAIN_SCALE  = 0.2; 
-  const double LOW_TRIP        = 0.04; 
-  const double HIGH_TRIP       = 0.45; 
+  const double MAX_GAIN_SCALE  = 0.10; 
+  const double LOW_TRIP        = 0.05; 
+  const double HIGH_TRIP       = 0.3; 
   
   minScale  = MIN_GAIN_SCALE;   
   gainSlope = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
@@ -325,11 +325,12 @@ void  updateVuDisplay(double p2p) {
   }
 
   FastLED.show();
-  
+
   Serial.print(peakFilter);
   Serial.print(" ");
   Serial.print(levelFilter);
   Serial.println(" 50 100");
+  
 }
 
 double  spikeFilter(double filter, double live, double upTC, double downTC){

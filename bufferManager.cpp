@@ -32,11 +32,12 @@ void	BufferManager::addSample(short value) {
   if (_packCount == _packingNum) {
     value = _packedValue / _packingNum;
 
+/*
     if (_packingNum > 1 ) {
       Serial.print("400 -400 ");
       Serial.println(value - _DCBias);
     }
-      
+*/      
     //Serial.print("P");
 
     // put new averaged value into the head of the list and update sum.

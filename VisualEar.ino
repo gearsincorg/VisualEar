@@ -150,6 +150,13 @@ void  pressReset() {
 void  runAGC(){
   float OCR = (float)activeBands / (float)NUM_BANDS;
 
+  
+  Serial.print("AB ");
+  Serial.print(activeBands);
+  Serial.print(", GN ");
+  Serial.println(gainNumber);
+  
+
   if (OCR < lowTrip) {
     upGainAccumulator += 0.01;
   } else if (OCR > highTrip) {
@@ -204,6 +211,13 @@ double        gainScale;
   gainScale  = minScale * pow(gainSlope, gainNumber);
   myFFT.setInputScale(gainScale);
 
+  /*
+  Serial.print("Gain # ");
+  Serial.print(gainNumber);
+  Serial.print(" Gain ");
+  Serial.println(gainScale * 100);
+  */
+
   return gainNumber;
 }
 
@@ -231,7 +245,7 @@ void  fillBands (void){
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
-      noiseFloor = 95 * noiseFloor / 100;  // equiv 0.95 factor.
+      noiseFloor = 97 * noiseFloor / 100;  // equiv 0.97 factor.
     }
   }
 
