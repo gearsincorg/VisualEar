@@ -18,15 +18,17 @@ AudioAnalyzeFFT::AudioAnalyzeFFT(void) : AudioStream(1, inputQueueArray)
   LO_FFT = arduinoFFT_float(LO_vReal, LO_vImag,   LO_weights, LO_FFT_SAMPLES, LO_SAMPLING_FREQ, FFT_WIN_TYP_HAMMING);    
   LO_Buffer = BufferManager(LO_vReal, LO_weights, LO_short,   LO_FFT_SAMPLES, LO_SAMPLE_SKIP);
   
+  MD_FFT = arduinoFFT_float(MD_vReal, MD_vImag,   MD_weights, MD_FFT_SAMPLES, MD_SAMPLING_FREQ, FFT_WIN_TYP_HAMMING);    
+  MD_Buffer = BufferManager(MD_vReal, MD_weights, MD_short,   MD_FFT_SAMPLES, MD_SAMPLE_SKIP);
+  
   HI_FFT = arduinoFFT_float(HI_vReal, HI_vImag,   HI_weights, HI_FFT_SAMPLES, HI_SAMPLING_FREQ, FFT_WIN_TYP_HAMMING);    
   HI_Buffer = BufferManager(HI_vReal, HI_weights, HI_short,   HI_FFT_SAMPLES, HI_SAMPLE_SKIP);
 
   state = 0;
   outputflag = false;
 
-//  memset(LO_vReal, 0, sizeof(LO_vReal));
-//  memset(Hi_vReal, 0, sizeof(Hi_vReal));
   memset(LO_short, 0, sizeof(LO_short));
+  memset(MD_short, 0, sizeof(MD_short));
   memset(HI_short, 0, sizeof(HI_short));
   
 }
@@ -50,12 +52,14 @@ void  AudioAnalyzeFFT::setInputScale(float scale){
   inputScale = scale;
 }
 
-float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binNumber, float noiseThreshold) {
+float AudioAnalyzeFFT::read(int  range, unsigned short binNumber, float noiseThreshold) {
   float tempVal;
 
-  if (!hiRange && (binNumber < LO_FREQ_BINS)) {
+  if ((range==0) && (binNumber < LO_FREQ_BINS)) {
     tempVal = LO_vReal[binNumber];
-  } else if (hiRange && (binNumber < HI_FREQ_BINS)) {
+  } else if ((range==1) && (binNumber < MD_FREQ_BINS)) {
+    tempVal = MD_vReal[binNumber];
+  } else if ((range==2) && (binNumber < HI_FREQ_BINS)) {
     tempVal = HI_vReal[binNumber];
   } else {
     tempVal = 0;
@@ -67,15 +71,15 @@ float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binNumber, float noise
   return (tempVal);
 }
 
-float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binNumber) {
-  return (read(hiRange, binNumber, 0.0));
+float AudioAnalyzeFFT::read(int  range, unsigned short binNumber) {
+  return (read(range, binNumber, 0.0));
 }
 
-float AudioAnalyzeFFT::read(bool  hiRange, unsigned short binFirst, unsigned short binLast, float noiseThreshold) {
+float AudioAnalyzeFFT::read(int  range, unsigned short binFirst, unsigned short binLast, float noiseThreshold) {
   
   float sum = 0.0;
   do {
-    sum += read(hiRange, binFirst++, noiseThreshold);
+    sum += read(range, binFirst++, noiseThreshold);
   } while (binFirst <= binLast);
   return sum;
 }
@@ -99,6 +103,7 @@ void AudioAnalyzeFFT::update(void)
   // add the latest block to the hi and low buffers
   for (short sample = 0; sample < BURST_SAMPLES; sample++) {
     LO_Buffer.addSample(*src);
+    MD_Buffer.addSample(*src);
     HI_Buffer.addSample(*src);
     src++;
   }
@@ -112,10 +117,12 @@ void AudioAnalyzeFFT::update(void)
 
     // transfer the accumulated buffers to the FFT.  Remove bias and apply weights along the way
     LO_Buffer.transfer(inputScale);
+    MD_Buffer.transfer(inputScale);
     HI_Buffer.transfer(inputScale);
 
     // Process the FFT
     LO_FFT.RunFFT();
+    MD_FFT.RunFFT();
     HI_FFT.RunFFT();
 
     outputflag = true;

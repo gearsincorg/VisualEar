@@ -15,8 +15,8 @@
 
 #define TOP_HUE_NUMBER      240.0
 
-//#define GRAVITY          -9.8                //  
-#define GRAVITY            -2.0                //  
+//#define GRAVITY            -2.0                //  
+#define GRAVITY            -1.5                //  
 #define LED_PER_METER       60
 
 extern double minScale;

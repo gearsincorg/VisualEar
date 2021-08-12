@@ -4,9 +4,10 @@
 #define FLIP_LED_ORDER      true
 #define NUM_MODES 4
 
-#define NUM_LO_BANDS        41                    // Number of LOW frequency bands  
-#define NUM_HI_BANDS        63                    // Number of HIGH frequency bands
-#define NUM_BANDS           (NUM_LO_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed
+#define NUM_LO_BANDS        37                    // Number of LOW frequency bands  
+#define NUM_MD_BANDS        48                    // Number of MID frequency bands  
+#define NUM_HI_BANDS        52                    // Number of HIGH frequency bands
+#define NUM_BANDS           (NUM_LO_BANDS + NUM_MD_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed
 
 #define NUM_LEDS            NUM_BANDS             // One LED per Band
 #define MIN_DB              30.0

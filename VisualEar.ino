@@ -48,8 +48,9 @@ float     downGainAccumulator = 0;
 
 // -- LED Display Data
 uint32_t  bandValues[NUM_BANDS];
-uint16_t  LO_bandBins[NUM_LO_BANDS + 1] = {11,12,13,14,15,16,17,18,19,20,21,22,24,25,27,28,30,32,33,35,38,40,42,45,47,50,53,56,60,63,67,71,75,80,84,89,95,100,106,112,119,126};
-uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {21,22,24,25,27,28,30,32,33,35,37,40,42,45,47,50,53,56,60,63,67,71,75,79,84,89,94,100,106,112,119,126,134,142,150,159,168,178,189,200,212,225,238,252,267,283,300,318,337,357,378,400,424,449,476,504,534,566,600,636,673,713,756,801};
+uint16_t  LO_bandBins[NUM_LO_BANDS + 1] = {17,18,19,20,21,22,23,24,25,26,27,28,30,31,32,34,35,37,38,40,42,44,46,48,50,52,54,57,59,62,64,67,70,73,77,80,84};
+uint16_t  MD_bandBins[NUM_MD_BANDS + 1] = {42,44,46,48,50,52,54,57,59,62,64,67,70,73,77,80,84,87,91,95,99,104,108,113,118,123,129,135,141,147,153,160,167,174,182,190,199,207,217,226,236,247,258,269,281,293,306,320,334};
+uint16_t  HI_bandBins[NUM_HI_BANDS + 1] = {42,44,46,48,50,52,54,57,59,62,64,67,70,73,77,80,84,87,91,95,99,104,108,113,118,123,129,135,141,147,153,160,167,174,182,190,199,207,217,226,236,247,258,269,281,293,306,320,334,349,364,381,397};
 
 // Create the Audio components.  These should be created in the
 AudioInputI2S          audioInput;     // audio shield: mic or line-in
@@ -239,7 +240,19 @@ void  fillBands (void){
     
   for (int b = 0; b < NUM_LO_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
-    bandValues[band] = (uint32_t)myFFT.read(false, LO_bandBins[b], LO_bandBins[b+1], noiseFloor);
+    bandValues[band] = (uint32_t)myFFT.read(0, LO_bandBins[b], LO_bandBins[b+1], noiseFloor);
+    if (bandValues[band] > 2)
+      activeBands++;
+
+    // Adjust Noise Floor
+    if (noiseFloor > BASE_NOISE_FLOOR) {
+      noiseFloor = 97 * noiseFloor / 100;  // equiv 0.97 factor.
+    }
+  }
+
+  for (int b = 0; b < NUM_MD_BANDS; b++, band++){
+    // Accumulate freq values from all bins that match this LED band,
+    bandValues[band] = (uint32_t)myFFT.read(1, MD_bandBins[b], MD_bandBins[b+1], noiseFloor);
     if (bandValues[band] > 2)
       activeBands++;
 
@@ -251,7 +264,7 @@ void  fillBands (void){
 
   for (int b = 0; b < NUM_HI_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
-    bandValues[band] = (uint32_t)myFFT.read(true, HI_bandBins[b], HI_bandBins[b+1], noiseFloor);
+    bandValues[band] = (uint32_t)myFFT.read(2, HI_bandBins[b], HI_bandBins[b+1], noiseFloor);
     if (bandValues[band] > 2)
       activeBands++;
 
