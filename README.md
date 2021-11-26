@@ -23,7 +23,7 @@ https://hackaday.io/project/175944-the-visual-ear
 
 Display Specs:
 
-- Display Bands:  104 Bands, spanning 43 Hz - 16744 Hz (8.5 Octaves)
+- Display Bands:  104 Bands, spanning 43 Hz - 16744 Hz (8.5 Octaves, 12 LED's per octave)
 - Intensity Range: Each Band is displayed with a secific color, and 255 intensity levels
 - Display Update interval: 11.6 mSec (86 Hz)
 - Audio to Visual Latency:  Max 13.5 mSec (11.6 mSec acquisition + 1.9 mSec for dual FFT & display)
