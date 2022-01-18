@@ -5,18 +5,13 @@
   For details see:  https://hackaday.io/project/175944-the-visual-ear
   Copyright (C) 2021 Philip Malone
 
-  This program is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  Display Modes:
+  0 - Off
+  1 - VU Mater
+  2 - Specturm Analyser
+  3 - Tone Detector
+  4 - Fireworks
+  
 */
 
 #include  <Audio.h>
@@ -32,7 +27,7 @@
 #include "FastLED.h"
 
 // -- LED Display Constants
-#define START_NOISE_FLOOR   80  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
+#define START_NOISE_FLOOR   40  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)  was 80
 #define BASE_NOISE_FLOOR    40  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 
 #define UI_HOLD_MS      3000
@@ -148,14 +143,15 @@ void  pressReset() {
 }
 
 void  runAGC(){
+  // Automatic Gain Control
+    // Automatically control the gain to keep a reasonable quantity of active frequency buckets
+  
   float OCR = (float)activeBands / (float)NUM_BANDS;
-
   
   Serial.print("AB ");
   Serial.print(activeBands);
   Serial.print(", GN ");
   Serial.println(gainNumber);
-  
 
   if (OCR < lowTrip) {
     upGainAccumulator += 0.01;

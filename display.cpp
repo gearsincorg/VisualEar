@@ -64,6 +64,7 @@ void  initDisplay(){
   FastLED.clear();
   
   switch (displayMode) {
+    default:
     case 0:
       break;
 
@@ -75,9 +76,12 @@ void  initDisplay(){
       
     case 2:
       initFFTDisplay(NUM_BANDS);
-      break;
 
     case 3:
+      initFFTDisplay(NUM_BANDS);
+      break;
+
+    case 4:
       initBallDisplay(NUM_BANDS);
       break;
   }
@@ -96,8 +100,13 @@ void  updateDisplay(uint32_t * bandValues) {
         break;
   
       case 3:
+        updateToneDisplay(bandValues);
+        break;
+
+      case 4:
         updateBallDisplay(bandValues);
         break;
+          
     }
   }
 }
@@ -109,7 +118,7 @@ void  updateDisplay(uint32_t * bandValues) {
 // ======================================================================================================
 //  Basic display functions
 // ======================================================================================================
-void  setLEDBand(int pos,  int band,  int intensity) {
+void  setLEDBand(int band,  int intensity) {
   setLED(band, (uint16_t)(band * hueStep), intensity);
 }
 
@@ -131,7 +140,7 @@ void  showMode () {
   FastLED.clearData();
   FastLED.show();
   for (int I = 0; I < displayMode; I++) {
-    setLEDBand(I * 4, I * 8, MAX_LED_BRIGHTNESS); 
+    setLEDBand(I * 2, MAX_LED_BRIGHTNESS); 
   }
   FastLED.show();
 }
@@ -146,7 +155,7 @@ void  initFFTDisplay(int numberBands) {
   const double MIN_GAIN_SCALE  = 0.00125;
   const double MAX_GAIN_SCALE  = 0.10; 
   const double LOW_TRIP        = 0.05; 
-  const double HIGH_TRIP       = 0.3; 
+  const double HIGH_TRIP       = 0.25; // Was 0.3
   
   minScale  = MIN_GAIN_SCALE;   
   gainSlope = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
@@ -172,12 +181,43 @@ void  updateFFTDisplay (uint32_t * bandValues){
     }
   
     // Display LED Band in the correct Hue.
-    setLEDBand(band, band, ledBrightness);
+    setLEDBand(band, ledBrightness);
   }
   
   // Update LED display
   FastLED.show();
 }
+
+// ======================================================================================================
+//  Tone display functions
+// ======================================================================================================
+
+// Update the LED string based on the intensities of all the Frequency bins.
+void  updateToneDisplay (uint32_t * bandValues){
+  uint16_t ledBrightness = 0;
+  uint16_t maxBand = -1;
+
+  // Find the band with the strongets signal and light it up.
+  for (byte band = 0; band < numBands; band++) {
+    if (bandValues[band] > ledBrightness) {
+      ledBrightness = bandValues[band];
+      maxBand = band;
+    }
+  }
+   
+  if (ledBrightness > 0) {
+    FastLED.clearData();
+    // Display LED Band in the correct Hue.
+    if (ledBrightness > MAX_LED_BRIGHTNESS)  {
+      ledBrightness = MAX_LED_BRIGHTNESS;
+    }
+
+    // Update LED display
+    setLEDBand(maxBand, ledBrightness);
+    FastLED.show();
+  }
+}
+
 
 // ======================================================================================================
 //  Air Balls display functions
@@ -191,7 +231,7 @@ void  initBallDisplay(int numberBands) {
   const double MIN_GAIN_SCALE  = 0.001;
   const double MAX_GAIN_SCALE  = 0.05;
   const double LOW_TRIP        = 0.04; 
-  const double HIGH_TRIP       = 0.35; 
+  const double HIGH_TRIP       = 0.30; // Was 0.35
   
   minScale  = MIN_GAIN_SCALE;   
   gainSlope = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   

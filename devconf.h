@@ -2,7 +2,7 @@
 #define devconf_h
 
 #define FLIP_LED_ORDER      true
-#define NUM_MODES 4
+#define NUM_MODES 5
 
 #define NUM_LO_BANDS        25                    // Number of LOW frequency bands  
 #define NUM_MD_BANDS        31                    // Number of MID frequency bands  

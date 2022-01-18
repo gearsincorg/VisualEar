@@ -15,8 +15,9 @@
 
 #define TOP_HUE_NUMBER      240.0
 
-//#define GRAVITY            -2.0                //  
-#define GRAVITY            -1.5                //  
+//#define GRAVITY          -2.0                //  
+#define GRAVITY            -1.9                //  was 1.5
+
 #define LED_PER_METER       60
 
 extern double minScale;
@@ -36,6 +37,7 @@ void  initFFTDisplay(int numBands) ;
 void  initBallDisplay(int numBands) ;
 
 void  updateFFTDisplay (uint32_t * bandValues);
+void  updateToneDisplay (uint32_t * bandValues);
 void  updateBallDisplay (uint32_t * bandValues);
 void  updateVuDisplay(double  peakToPeak);
 
