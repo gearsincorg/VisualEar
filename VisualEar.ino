@@ -11,6 +11,9 @@
   2 - Specturm Analyser
   3 - Tone Detector
   4 - Fireworks
+
+  Version Date      Description
+  2.0     2/2/2022  First release with 4 functions and 104 LEDs
   
 */
 
@@ -27,7 +30,7 @@
 #include "FastLED.h"
 
 // -- LED Display Constants
-#define START_NOISE_FLOOR   40  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)  was 80
+#define START_NOISE_FLOOR   60  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)  was 80
 #define BASE_NOISE_FLOOR    40  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 
 #define UI_HOLD_MS      3000

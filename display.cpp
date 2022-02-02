@@ -71,7 +71,6 @@ void  initDisplay(){
     case 1:
       orangeLED   = (int)((ORANGE_DB - MIN_DB) / DB_PER_LED);
       redLED      = (int)((RED_DB    - MIN_DB) / DB_PER_LED);
-      delay(250);
       break;
       
     case 2:
@@ -140,7 +139,7 @@ void  showMode () {
   FastLED.clearData();
   FastLED.show();
   for (int I = 0; I < displayMode; I++) {
-    setLEDBand(I * 2, MAX_LED_BRIGHTNESS); 
+    setLEDBand(I * 8, MAX_LED_BRIGHTNESS); 
   }
   FastLED.show();
 }
@@ -335,42 +334,45 @@ void  displayBalls() {
 void  updateVuDisplay(double p2p) {
   double  db = (9.1024 * log(p2p)) + 115.82;
 
-  levelFilter = spikeFilter(levelFilter, db, 0.2, 0.05);
-  peakFilter  = spikeFilter(peakFilter,  db, 1.0, 0.001);
-
-  int levelLED    = (int)((levelFilter - MIN_DB) / DB_PER_LED);
-  int peakLED     = (int)((peakFilter  - MIN_DB) / DB_PER_LED);
-
-  if (peakLED < levelLED) {
-    peakLED = levelLED;
-  }
-
-  // run up from bottom of display to top.
-  FastLED.clearData();
-  short hue = 96;
-  for (short l=0; l < NUM_LEDS; l++) {
-    if (l >= redLED)
-      hue = 0;
-    else if (l >= orangeLED)    
-      hue = 32;
-      
-    if (l == peakLED){
-      setLED(l, hue, MAX_LED_BRIGHTNESS);
-    } else if (l <= levelLED) {
-      setLED(l, hue, MAX_LED_BRIGHTNESS / 4);
-    } else {
-      setLED(l, hue, DIM_LED_BRIGHTNESS);
+  if (millis() > modeChangeRelease) {
+    levelFilter = spikeFilter(levelFilter, db, 0.2, 0.05);
+    peakFilter  = spikeFilter(peakFilter,  db, 1.0, 0.001);
+  
+    int levelLED    = (int)((levelFilter - MIN_DB) / DB_PER_LED);
+    int peakLED     = (int)((peakFilter  - MIN_DB) / DB_PER_LED);
+  
+    if (peakLED < levelLED) {
+      peakLED = levelLED;
     }
-                
+  
+    // run up from bottom of display to top.
+    FastLED.clearData();
+    short hue = 96;
+    for (short l=0; l < NUM_LEDS; l++) {
+      if (l >= redLED)
+        hue = 0;
+      else if (l >= orangeLED)    
+        hue = 32;
+        
+      if (l == peakLED){
+        setLED(l, hue, MAX_LED_BRIGHTNESS);
+      } else if (l <= levelLED) {
+        setLED(l, hue, MAX_LED_BRIGHTNESS / 4);
+      } else {
+        setLED(l, hue, DIM_LED_BRIGHTNESS);
+      }
+                  
+    }
+  
+    FastLED.show();
   }
 
-  FastLED.show();
-
+  /*
   Serial.print(peakFilter);
   Serial.print(" ");
   Serial.print(levelFilter);
   Serial.println(" 50 100");
-  
+  */
 }
 
 double  spikeFilter(double filter, double live, double upTC, double downTC){
