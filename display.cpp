@@ -51,9 +51,13 @@ short  getDisplayMode() {
 }
 
 short  switchDisplayMode() {
-  displayMode = (short)((displayMode + 1 ) % NUM_MODES);
+  if (displayMode == DISPLAY_MODE_BALLS) {
+    displayMode = DISPLAY_MODE_OFF;
+  } else {
+    displayMode = DISPLAY_MODE_BALLS;
+  }
+  
   modeChangeRelease = millis() + MODE_CHANGE_PAUSE;
-  showMode();
   return (displayMode);
 }
 
@@ -62,25 +66,27 @@ void  initDisplay(){
   delay(250);      // sanity check delay
   FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
   FastLED.clear();
-  
+
   switch (displayMode) {
     default:
-    case 0:
+    case DISPLAY_MODE_OFF:
+      FastLED.clearData();
+      FastLED.show();
       break;
 
-    case 1:
+    case DISPLAY_MODE_VU:
       orangeLED   = (int)((ORANGE_DB - MIN_DB) / DB_PER_LED);
       redLED      = (int)((RED_DB    - MIN_DB) / DB_PER_LED);
       break;
       
-    case 2:
+    case DISPLAY_MODE_FFT:
       initFFTDisplay(NUM_BANDS);
 
-    case 3:
+    case DISPLAY_MODE_TONE:
       initFFTDisplay(NUM_BANDS);
       break;
 
-    case 4:
+    case DISPLAY_MODE_BALLS:
       initBallDisplay(NUM_BANDS);
       break;
   }
@@ -91,18 +97,18 @@ void  updateDisplay(uint32_t * bandValues) {
   if (millis() > modeChangeRelease) {
     switch (displayMode) {
       default:
-      case 0:
+      case DISPLAY_MODE_OFF:
         break;
       
-      case 2:
+      case DISPLAY_MODE_FFT:
         updateFFTDisplay(bandValues);
         break;
   
-      case 3:
+      case DISPLAY_MODE_TONE:
         updateToneDisplay(bandValues);
         break;
 
-      case 4:
+      case DISPLAY_MODE_BALLS:
         updateBallDisplay(bandValues);
         break;
           
@@ -152,7 +158,7 @@ void  showMode () {
 void  initFFTDisplay(int numberBands) {
 
   const double MIN_GAIN_SCALE  = 0.00125;
-  const double MAX_GAIN_SCALE  = 0.10; 
+  const double MAX_GAIN_SCALE  = 0.2; // was 0.1
   const double LOW_TRIP        = 0.05; 
   const double HIGH_TRIP       = 0.25; // Was 0.3
   

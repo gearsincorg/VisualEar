@@ -15,8 +15,15 @@
 
 #define TOP_HUE_NUMBER      240.0
 
+#define DISPLAY_MODE_OFF   0
+#define DISPLAY_MODE_VU    1
+#define DISPLAY_MODE_FFT   2
+#define DISPLAY_MODE_TONE  3
+#define DISPLAY_MODE_BALLS 4
+
+
 //#define GRAVITY          -2.0                //  
-#define GRAVITY            -1.9                //  was 1.5
+#define GRAVITY            -1.2                //  was 1.5
 
 #define LED_PER_METER       60
 

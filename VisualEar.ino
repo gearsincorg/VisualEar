@@ -3,7 +3,7 @@
   Audio spectrum analyser
   LED strip display.
   For details see:  https://hackaday.io/project/175944-the-visual-ear
-  Copyright (C) 2021 Philip Malone
+  Copyright (C) 2022 Philip Malone
 
   Display Modes:
   0 - Off
@@ -87,6 +87,7 @@ void setup() {
   setDisplayMode( EEPROM.read(MODE_ADDRESS));
   setGain(EEPROM.read(GAIN_ADDRESS));
   delay(500);
+  Serial.println("Visual Ear 10/26/2022  RoboTree Branch");
 
   initDisplay();
 }
@@ -157,7 +158,7 @@ void  runAGC(){
   Serial.println(gainNumber);
 
   if (OCR < lowTrip) {
-    upGainAccumulator += 0.01;
+    upGainAccumulator += 0.02;
   } else if (OCR > highTrip) {
     upGainAccumulator -= 0.04;
   }

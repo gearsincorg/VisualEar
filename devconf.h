@@ -1,7 +1,7 @@
 #ifndef devconf_h /* Prevent loading library twice */
 #define devconf_h
 
-#define FLIP_LED_ORDER      true
+#define FLIP_LED_ORDER      false
 #define NUM_MODES 5
 
 #define NUM_LO_BANDS        25                    // Number of LOW frequency bands  
@@ -9,7 +9,7 @@
 #define NUM_HI_BANDS        48                    // Number of HIGH frequency bands
 #define NUM_BANDS           (NUM_LO_BANDS + NUM_MD_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed (104)
 
-#define NUM_LEDS            NUM_BANDS             // One LED per Band
+#define NUM_LEDS            150                   
 #define MIN_DB              30.0
 #define ORANGE_DB           70.0
 #define RED_DB              85.0
