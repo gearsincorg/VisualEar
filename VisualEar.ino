@@ -84,7 +84,8 @@ void setup() {
   AudioMemory(NUM_BURSTS);
 
   // read NV Ram
-  setDisplayMode( EEPROM.read(MODE_ADDRESS));
+//setDisplayMode( EEPROM.read(MODE_ADDRESS));
+  setDisplayMode(DISPLAY_MODE_BALLS);
   setGain(EEPROM.read(GAIN_ADDRESS));
   delay(500);
   Serial.println("Visual Ear 10/26/2022  RoboTree Branch");
@@ -152,16 +153,26 @@ void  runAGC(){
   
   float OCR = (float)activeBands / (float)NUM_BANDS;
   
-  Serial.print("AB ");
-  Serial.print(activeBands);
-  Serial.print(", GN ");
-  Serial.println(gainNumber);
-
+  
   if (OCR < lowTrip) {
     upGainAccumulator += 0.02;
   } else if (OCR > highTrip) {
     upGainAccumulator -= 0.04;
   }
+/*
+  Serial.print("AB=");
+  Serial.print(activeBands);
+  Serial.print(", OCR=");
+  Serial.print(OCR);
+
+  Serial.print(", LT=");
+  Serial.print(lowTrip);
+  Serial.print(", HT=");
+  Serial.print(highTrip);
+
+  Serial.print(", UA=");
+  Serial.print(upGainAccumulator);
+*/
 
   if (upGainAccumulator > 1.0) {
     bumpGain(1);
@@ -171,16 +182,9 @@ void  runAGC(){
     upGainAccumulator = 0.0;
   }
 
-  /*  
-  Serial.print("AGC OLC ");
-  Serial.print(OLC);
-  Serial.print(", OCR ");
-  Serial.print(OCR);
-  Serial.print(", UA ");
-  Serial.print(upGainAccumulator);
-  Serial.print(", Gain Number ");
-  Serial.println(gainNumber);
-  */
+  Serial.print(", GN=");
+  Serial.print(gainNumber);
+  Serial.println("");
 }
 
 void  bumpGain(int step ) {
@@ -239,8 +243,8 @@ void  fillBands (void){
   for (int b = 0; b < NUM_LO_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
     bandValues[band] = (uint32_t)myFFT.read(0, LO_bandBins[b], LO_bandBins[b+1], noiseFloor);
-    if (bandValues[band] > 2)
-      activeBands++;
+//    if (bandValues[band] > 2)
+//      activeBands++;
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
@@ -251,8 +255,8 @@ void  fillBands (void){
   for (int b = 0; b < NUM_MD_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
     bandValues[band] = (uint32_t)myFFT.read(1, MD_bandBins[b], MD_bandBins[b+1], noiseFloor);
-    if (bandValues[band] > 2)
-      activeBands++;
+//    if (bandValues[band] > 2)
+//      activeBands++;
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {
@@ -263,8 +267,8 @@ void  fillBands (void){
   for (int b = 0; b < NUM_HI_BANDS; b++, band++){
     // Accumulate freq values from all bins that match this LED band,
     bandValues[band] = (uint32_t)myFFT.read(2, HI_bandBins[b], HI_bandBins[b+1], noiseFloor);
-    if (bandValues[band] > 2)
-      activeBands++;
+//    if (bandValues[band] > 2)
+//      activeBands++;
 
     // Adjust Noise Floor
     if (noiseFloor > BASE_NOISE_FLOOR) {

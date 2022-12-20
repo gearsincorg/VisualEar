@@ -9,7 +9,11 @@
 #define NUM_HI_BANDS        48                    // Number of HIGH frequency bands
 #define NUM_BANDS           (NUM_LO_BANDS + NUM_MD_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed (104)
 
-#define NUM_LEDS            150                   
+#define EYE_LEDS             16
+#define TREE_LEDS           300
+#define NUM_LEDS            EYE_LEDS + TREE_LEDS
+  
+                 
 #define MIN_DB              30.0
 #define ORANGE_DB           70.0
 #define RED_DB              85.0
@@ -25,7 +29,7 @@
 #define GAIN_ADDRESS         2
 
 #define MIN_GAIN_NUM         0
-#define MAX_GAIN_NUM        (NUM_LEDS - 1)
+#define MAX_GAIN_NUM        (100 - 1)
 #define GAIN_RANGE          (MAX_GAIN_NUM - MIN_GAIN_NUM)
 
 #endif

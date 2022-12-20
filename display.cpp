@@ -23,6 +23,13 @@ uint32_t  lastMoveMs = 0;
 float     pos[MAX_BALLS];
 float     vel[MAX_BALLS];
 uint8_t   band[MAX_BALLS];
+uint8_t   fast[MAX_BALLS];
+uint8_t   bright[MAX_BALLS];
+
+int       fastCount = 0;
+int       fastAddCount = 0;
+
+uint16_t   eyeHue = 0;
 
 uint8_t   numBalls[NUM_BANDS];
 short     displayMode; 
@@ -38,6 +45,8 @@ int       redLED;
 
 double  peakFilter = 0;
 double  levelFilter = 0;
+
+extern int activeBands;
 
 // ======================================================================================================
 // Generic Display Functions
@@ -64,7 +73,7 @@ short  switchDisplayMode() {
 void  initDisplay(){
 
   delay(250);      // sanity check delay
-  FastLED.addLeds<APA102, BGR>(leds, NUM_LEDS);
+  FastLED.addLeds<APA102, 11,13,BGR,DATA_RATE_MHZ(8)>(leds, NUM_LEDS);
   FastLED.clear();
 
   switch (displayMode) {
@@ -236,7 +245,7 @@ void  initBallDisplay(int numberBands) {
   const double MIN_GAIN_SCALE  = 0.001;
   const double MAX_GAIN_SCALE  = 0.05;
   const double LOW_TRIP        = 0.04; 
-  const double HIGH_TRIP       = 0.30; // Was 0.35
+  const double HIGH_TRIP       = 0.10; // Was 0.35
   
   minScale  = MIN_GAIN_SCALE;   
   gainSlope = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   
@@ -247,6 +256,8 @@ void  initBallDisplay(int numberBands) {
   memset(pos, 0, sizeof(pos));
   memset(vel, 0, sizeof(vel));
   memset(band, 0, sizeof(band));
+  memset(fast, 0, sizeof(fast));
+  memset(bright, 0, sizeof(bright));
   memset(numBalls, 0, sizeof(numBalls));
 }
 
@@ -262,6 +273,8 @@ void updateBallDisplay (uint32_t * bandValues){
 void  addBalls(uint32_t * bandValues){
     uint32_t val;
     double   velocity;
+
+    activeBands = 0;
     
     for (int b = 0; b < numBands; b++ ){
       val = bandValues[b];
@@ -270,13 +283,14 @@ void  addBalls(uint32_t * bandValues){
       }
       
       if (val > BALL_THRESHOLD) {
+        activeBands++;
         velocity = (double)val / 100.0;
-        addBall(velocity, b);
+        addBall(velocity, b, val);
       }
     }
 }
 
-void  addBall(float avel, int  aband) {
+void  addBall(float avel, int  aband, int intens) {
 
     // add new ball to end of list of there is room
     if (nextBall < MAX_BALLS) {
@@ -285,6 +299,14 @@ void  addBall(float avel, int  aband) {
         pos[nextBall] = 0;
         vel[nextBall] = avel;
         band[nextBall] = aband;
+        bright[nextBall] = intens;
+
+        if (fastAddCount++ == 20){
+          fast[nextBall] = true;
+          fastAddCount = 0;
+        } else {
+          fast[nextBall] = false;
+        }
   
         numBalls[aband]++;
         nextBall++;
@@ -300,22 +322,34 @@ void  moveBalls() {
     double deltaV        = GRAVITY * elapsed ;
     double halfATSquared = deltaV  * elapsed * 0.5 ;
 
+    bool   fastMove = false;
+
+    if (fastCount++ == FAST_COUNTER) {
+      fastMove = true;
+      fastCount = 0;
+    }
+    
     // process each ball
     for (int ball = 0; ball < nextBall; ball++) {
-      pos[ball] += (halfATSquared + (vel[ball] * elapsed)); 
-      vel[ball] += deltaV  ;
 
-      // has the ball hit the ground?
-      if (pos[ball] <= 0) {
-
-        // remove this ball and move all others down.
-        nextBall--;
-        numBalls[band[ball]]--;
-        
-        for (int b = ball; b < nextBall; b++) {
-          pos[b] = pos[b+1];
-          vel[b] = vel[b+1];
-          band[b] = band[b+1];
+      if (fast[ball] || fastMove) {
+        pos[ball] += (halfATSquared + (vel[ball] * elapsed)); 
+        vel[ball] += deltaV  ;
+  
+        // has the ball hit the ground?
+        if (pos[ball] <= 0) {
+  
+          // remove this ball and move all others down.
+          nextBall--;
+          numBalls[band[ball]]--;
+          
+          for (int b = ball; b < nextBall; b++) {
+            pos[b] = pos[b+1];
+            vel[b] = vel[b+1];
+            band[b] = band[b+1];
+            fast[b] = fast[b+1];
+            bright[b] = bright[b+1];
+          }
         }
       }
     }
@@ -323,14 +357,21 @@ void  moveBalls() {
 }
 
 void  displayBalls() {
+  int hue;
 
-    // process each ball
-    FastLED.clearData();
-    for (int ball = 0; ball < nextBall; ball++) {
-      setLED((int)(pos[ball] * LED_PER_METER), band[ball] * hueStep, MAX_LED_BRIGHTNESS); 
-    }  
-    
-    FastLED.show();
+  // process each eye
+  FastLED.clearData();
+  eyeHue++;
+  for (int led = 0; led < EYE_LEDS; led++) {
+    setLED(led, (eyeHue >> 4) & 0xFF, 64); 
+  }
+  
+  for (int ball = 0; ball < nextBall; ball++) {
+    hue = (int)(band[ball] * hueStep * 2) & 0x00FF;
+    setLED(EYE_LEDS + ((int)(pos[ball] * LED_PER_METER)), hue, bright[ball]); 
+  }  
+  
+  FastLED.show();
 }
 
 // ======================================================================================================
