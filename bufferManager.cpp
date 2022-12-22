@@ -38,7 +38,6 @@ void	BufferManager::addSample(short value) {
       Serial.println(value - _DCBias);
     }
 */      
-    //Serial.print("P");
 
     // put new averaged value into the head of the list and update sum.
     _sampleSum -= _vShort[_nextSample];

@@ -2,12 +2,11 @@
 #define devconf_h
 
 #define FLIP_LED_ORDER      true
-#define NUM_MODES 5
+#define NUM_MODES 4
 
-#define NUM_LO_BANDS        25                    // Number of LOW frequency bands  
-#define NUM_MD_BANDS        31                    // Number of MID frequency bands  
-#define NUM_HI_BANDS        48                    // Number of HIGH frequency bands
-#define NUM_BANDS           (NUM_LO_BANDS + NUM_MD_BANDS + NUM_HI_BANDS)    // Total Number of frequency bands being displayed (104)
+#define SUB_BANDS           24                     // Number of sub
+#define NUM_FFTS             4                     // Number of FFTs
+#define NUM_BANDS           (SUB_BANDS * NUM_FFTS) // Total Number of frequency bands being displayed
 
 #define NUM_LEDS            NUM_BANDS             // One LED per Band
 #define MIN_DB              30.0

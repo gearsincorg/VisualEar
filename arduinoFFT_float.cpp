@@ -53,7 +53,6 @@ byte arduinoFFT_float::Revision(void) {
 
 void arduinoFFT_float::RunFFT(void) {
     // Clear out imaginary values and run the FFT and then convert to magnitudes
-    
     memset((void *)this->_vImag, 0, (this->_samples * sizeof(float)));
     Compute(FFT_FORWARD);
     ComplexToMagnitude();

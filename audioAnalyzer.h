@@ -28,6 +28,7 @@
 #include "arm_math.h"
 #include "arduinoFFT_float.h"
 #include "bufferManager.h"
+#include "devconf.h"
 
 //  =================  Multi-Task Shared Data =================
 // -- Audio Constants
@@ -37,22 +38,10 @@
 #define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
 
 // Low Range Constants
-const unsigned short LO_SAMPLE_SKIP       =    16;         // How many samples to combine
-const unsigned short LO_SAMPLING_FREQ     = 44100 / LO_SAMPLE_SKIP; // Frequency at which microphone is sampled
-const unsigned short LO_FFT_SAMPLES       =  1024;        // Number of samples used to do FFT.
-const unsigned short LO_FREQ_BINS         =  LO_FFT_SAMPLES >> 1; // Number of results
-
-// Low Range Constants
-const unsigned short MD_SAMPLE_SKIP       =     8;         // How many samples to combine
-const unsigned short MD_SAMPLING_FREQ     = 44100 / MD_SAMPLE_SKIP; // Frequency at which microphone is sampled
-const unsigned short MD_FFT_SAMPLES       =  1024;        // Number of samples used to do FFT.
-const unsigned short MD_FREQ_BINS         =  MD_FFT_SAMPLES >> 1; // Number of results
-
-// High Range Constants
-const unsigned short HI_SAMPLE_SKIP       =     1;         // How many samples to combine
-const unsigned short HI_SAMPLING_FREQ     = 44100 / HI_SAMPLE_SKIP; // Frequency at which microphone is sampled
-const unsigned short HI_FFT_SAMPLES       =  1024;        // Number of samples used to do FFT. 
-const unsigned short HI_FREQ_BINS         =  HI_FFT_SAMPLES >> 1; // Number of results
+const unsigned short SAMPLE_SKIP[NUM_FFTS]    = {64, 16, 4, 1};           // How many samples to combine
+const unsigned short SAMPLING_FREQ[NUM_FFTS]  = {689, 2756, 11025, 44100}; // Frequency at which microphone is sampled
+const unsigned short FFT_SAMPLES       =  512;        // Number of samples used to do FFT.
+const unsigned short FREQ_BINS         =  FFT_SAMPLES >> 1; // Number of results
 
 // Audio Sample constants
 const unsigned short BURST_SAMPLES     =   128;         // Number of audio samples taken in one "Burst"
@@ -69,8 +58,7 @@ public:
   bool available(void);
   bool missingBlocks(void);
   float read(int range, unsigned short binNumber);
-  float read(int range, unsigned short binNumber, float noiseThreshold);
-  float read(int range, unsigned short binFirst, unsigned short binLast, float noiseThreshold);
+  float read(int range, unsigned short binFirst, unsigned short binLast);
   void  setInputScale(float scale);
   virtual void update(void);
 
@@ -89,30 +77,13 @@ private:
   
   audio_block_t *inputQueueArray[1];
 
-  short     LO_short[LO_FFT_SAMPLES];
-  float     LO_vReal[LO_FFT_SAMPLES];
-  float     LO_vImag[LO_FFT_SAMPLES];
-  float     LO_weights[LO_FFT_SAMPLES];
+  short     shortIn[NUM_FFTS][FFT_SAMPLES];
+  float     vReal[NUM_FFTS][FFT_SAMPLES];
+  float     vImag[NUM_FFTS][FFT_SAMPLES];
+  float     weights[NUM_FFTS][FFT_SAMPLES];
 
-  arduinoFFT_float LO_FFT;
-  BufferManager    LO_Buffer;
-
-  short     MD_short[MD_FFT_SAMPLES];
-  float     MD_vReal[MD_FFT_SAMPLES];
-  float     MD_vImag[MD_FFT_SAMPLES];
-  float     MD_weights[MD_FFT_SAMPLES];
-
-  arduinoFFT_float MD_FFT;
-  BufferManager    MD_Buffer;
-
-  short     HI_short[LO_FFT_SAMPLES];
-  float     HI_vReal[HI_FFT_SAMPLES];
-  float     HI_vImag[HI_FFT_SAMPLES];
-  float     HI_weights[HI_FFT_SAMPLES];
-  
-  arduinoFFT_float HI_FFT;
-  BufferManager    HI_Buffer;
-
+  arduinoFFT_float FFT[NUM_FFTS];
+  BufferManager    Buffer[NUM_FFTS];
 };
 
 #endif
