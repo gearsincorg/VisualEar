@@ -28,12 +28,11 @@
 arduinoFFT_float::arduinoFFT_float(){} ;
 
 // Constructor
-arduinoFFT_float::arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, float samplingFrequency, uint8_t windowType) {
+arduinoFFT_float::arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, uint8_t windowType) {
 	this->_vReal = vReal;
 	this->_vImag = vImag;
   this->_weights = weights;
 	this->_samples = samples;
-	this->_samplingFrequency = samplingFrequency;
 	this->_power = Exponent(samples);
 
   // load up weights array 

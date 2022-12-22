@@ -1,6 +1,11 @@
 #ifndef devconf_h /* Prevent loading library twice */
 #define devconf_h
 
+// Debug Information
+#define SHOW_BANKS 0
+#define SHOW_RAW   0
+#define SHOW_FILT  1
+
 #define FLIP_LED_ORDER      true
 #define NUM_MODES 4
 

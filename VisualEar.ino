@@ -226,17 +226,17 @@ void  fillBands (void){
   activeBands = 0;
     
   for (int subBands = 0; subBands < 4; subBands++){
-    Serial.printf(" %d --- ", subBands);
+    if (SHOW_BANKS) Serial.printf(" %d --- ", subBands);
     for (int sb = 0; sb < SUB_BANDS; sb++, band++){
       // Accumulate freq values from all bins that match this LED band,
-      bandStrength = (uint32_t)myFFT.read(subBands, bandBins[sb], bandBins[sb+1]);
+      bandStrength = (uint32_t)myFFT.read(subBands, bandBins[sb], bandBins[sb+1], 30);
       bandValues[band] = bandStrength;
-      Serial.printf("%d ", bandStrength);
+      if (SHOW_BANKS)Serial.printf("%d ", bandStrength);
       
       if (bandValues[band] > 2)
         activeBands++;
     }
-  Serial.println("");
+    if (SHOW_BANKS)  Serial.println("");
   }
-  Serial.println("");
+  if (SHOW_BANKS)  Serial.println("");
 }

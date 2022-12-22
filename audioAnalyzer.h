@@ -39,7 +39,7 @@
 
 // Low Range Constants
 const unsigned short SAMPLE_SKIP[NUM_FFTS]    = {64, 16, 4, 1};           // How many samples to combine
-const unsigned short SAMPLING_FREQ[NUM_FFTS]  = {689, 2756, 11025, 44100}; // Frequency at which microphone is sampled
+const float          CUTOFF_FREQ[NUM_FFTS]    = {220.0, 880.0, 5320.0, 14080.0}; // High Cutoff Freq
 const unsigned short FFT_SAMPLES       =  512;        // Number of samples used to do FFT.
 const unsigned short FREQ_BINS         =  FFT_SAMPLES >> 1; // Number of results
 
@@ -57,8 +57,8 @@ public:
   AudioAnalyzeFFT(void);
   bool available(void);
   bool missingBlocks(void);
-  float read(int range, unsigned short binNumber);
-  float read(int range, unsigned short binFirst, unsigned short binLast);
+  float read(int range, unsigned short binNumber, float noiseThreshold);
+  float read(int range, unsigned short binFirst, unsigned short binLast, float noiseThreshold);
   void  setInputScale(float scale);
   virtual void update(void);
 

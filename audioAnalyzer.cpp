@@ -16,8 +16,8 @@
 AudioAnalyzeFFT::AudioAnalyzeFFT(void) : AudioStream(1, inputQueueArray) 
 {
   for (int f=0; f < NUM_FFTS; f++){
-    FFT[f]    = arduinoFFT_float(vReal[f], vImag[f], weights[f], FFT_SAMPLES, SAMPLING_FREQ[f], FFT_WIN_TYP_HAMMING);    
-    Buffer[f] = BufferManager(vReal[f], weights[f], shortIn[f],   FFT_SAMPLES, SAMPLE_SKIP[f]);
+    FFT[f]    = arduinoFFT_float(vReal[f], vImag[f], weights[f], FFT_SAMPLES, FFT_WIN_TYP_HAMMING);    
+    Buffer[f] = BufferManager(vReal[f], weights[f], shortIn[f],   FFT_SAMPLES, SAMPLE_SKIP[f], CUTOFF_FREQ[f]);
     memset(shortIn[f], 0, sizeof(shortIn[f]));
     
   }
@@ -44,7 +44,7 @@ void  AudioAnalyzeFFT::setInputScale(float scale){
   inputScale = scale;
 }
 
-float AudioAnalyzeFFT::read(int  range, unsigned short binNumber) {
+float AudioAnalyzeFFT::read(int  range, unsigned short binNumber, float noiseThreshold) {
   float tempVal;
   
   if ((range < NUM_FFTS) && (binNumber < FREQ_BINS)) {
@@ -52,15 +52,18 @@ float AudioAnalyzeFFT::read(int  range, unsigned short binNumber) {
   } else {
     tempVal = 0;
   }
-    
+
+  if (tempVal < noiseThreshold) 
+    tempVal = 0;
+
   return (tempVal);
 }
 
-float AudioAnalyzeFFT::read(int  range, unsigned short binFirst, unsigned short binLast) {
+float AudioAnalyzeFFT::read(int  range, unsigned short binFirst, unsigned short binLast, float noiseThreshold) {
   
   float sum = 0.0;
   do {
-    sum += read(range, binFirst++);
+    sum += read(range, binFirst++, noiseThreshold);
   } while (binFirst <= binLast);
   return sum;
 }

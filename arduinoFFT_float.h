@@ -53,7 +53,7 @@ class arduinoFFT_float {
 public:
 	/* Constructor */
   arduinoFFT_float(void); 
-  arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, float samplingFrequency, uint8_t windowType); 
+  arduinoFFT_float(float *vReal, float *vImag, float *weights, unsigned short samples, uint8_t windowType); 
   
 	/* Destructor */
 	~arduinoFFT_float(void);
@@ -76,7 +76,6 @@ public:
 private:
 	/* Variables */
 	ushort _samples;
-	float _samplingFrequency;
 	float *_vReal;
   float *_vImag;
   float *_weights;
