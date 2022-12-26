@@ -139,12 +139,13 @@ void  pressReset() {
 void  runAGC(){
   float OCR = (float)activeBands / (float)NUM_BANDS;
 
-  /*
-  Serial.print("AB ");
-  Serial.print(activeBands);
-  Serial.print(", GN ");
-  Serial.println(gainNumber);
-  */
+  if (SHOW_GAINS) {
+    Serial.print("AB ");
+    Serial.print(activeBands);
+    Serial.print(", GN ");
+    Serial.println(gainNumber);
+  }
+  
 
   if (OCR < lowTrip) {
     upGainAccumulator += 0.01;

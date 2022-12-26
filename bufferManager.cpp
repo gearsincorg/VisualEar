@@ -45,34 +45,21 @@ BufferManager::BufferManager(float *vReal, float *weight, short *vShort, unsigne
 // Add the new sample to the circular buffer
 void	BufferManager::addSample(short value) {
   // Accumulate the new value
+  float filteredValue;
     
   _packedValue += value;
   _packCount++;
-  
-  float filteredValue = filt((float)value);
 
-  //---------------------------------------
-  if (SHOW_RAW) {
-    Serial.print(filteredValue);
-  }
-  //---------------------------------------
+  filteredValue = filt((float)value);
+
+  if (SHOW_RAW) Serial.print(filteredValue);
 
   //  look to see if we have a new packed value
   if (_packCount == _packingNum) {
     //value = _packedValue / _packingNum;  
     _lastFilt = filteredValue;
 
-    //---------------------------------------
-    if (SHOW_FILT) {
-      Serial.print(filteredValue);
-    }
-    //---------------------------------------
-/*
-    if (_packingNum > 1 ) {
-      Serial.print("400 -400 ");
-      Serial.println(value - _DCBias);
-    }
-*/      
+    if (SHOW_FILT) Serial.print(filteredValue);
 
     // put new averaged value into the head of the list and update sum.
     _sampleSum -= _vShort[_nextSample];
@@ -90,19 +77,15 @@ void	BufferManager::addSample(short value) {
     _packedValue = 0;
     _packCount   = 0;
   } else {
-    //---------------------------------------
-    if (SHOW_FILT) {
-      Serial.print(_lastFilt);
-    }
-    //---------------------------------------
+    if (SHOW_FILT) Serial.print(_lastFilt);
   }
 
   //---------------------------------------
   if (SHOW_FILT || SHOW_RAW) {
     if (_packingNum == 1)
-      Serial.println("");
+      Serial.println(" ");
     else
-      Serial.print(" ");
+      Serial.print(", ");
   }
   //---------------------------------------
 

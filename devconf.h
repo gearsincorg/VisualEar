@@ -2,12 +2,13 @@
 #define devconf_h
 
 // Debug Information
+#define SHOW_GAINS 1
 #define SHOW_BANKS 0
 #define SHOW_RAW   0
-#define SHOW_FILT  1
+#define SHOW_FILT  0
 
 #define FLIP_LED_ORDER      true
-#define NUM_MODES 4
+#define NUM_MODES 5
 
 #define SUB_BANDS           24                     // Number of sub
 #define NUM_FFTS             4                     // Number of FFTs

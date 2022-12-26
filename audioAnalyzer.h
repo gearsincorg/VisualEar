@@ -37,9 +37,11 @@
 #define MIC_SEL_PIN         33                    // unsigned short Select (WS)
 #define UNUSED_AUDIO_BITS   16                    // Bits do discard from the 32 bit audio sample.
 
+#define CUTOFF_SCALE  0.75
+
 // Low Range Constants
 const unsigned short SAMPLE_SKIP[NUM_FFTS]    = {64, 16, 4, 1};           // How many samples to combine
-const float          CUTOFF_FREQ[NUM_FFTS]    = {220.0, 880.0, 5320.0, 14080.0}; // High Cutoff Freq
+const float          CUTOFF_FREQ[NUM_FFTS]    = {220.0 * CUTOFF_SCALE, 880.0 * CUTOFF_SCALE, 3520.0 * CUTOFF_SCALE, 14080.0 * CUTOFF_SCALE}; // High Cutoff Freq
 const unsigned short FFT_SAMPLES       =  512;        // Number of samples used to do FFT.
 const unsigned short FREQ_BINS         =  FFT_SAMPLES >> 1; // Number of results
 
