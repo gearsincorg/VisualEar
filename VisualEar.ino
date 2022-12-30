@@ -29,6 +29,11 @@
 #define  FASTLED_INTERNAL
 #include "FastLED.h"
 
+// Set project identification here
+const char  Version[] = "Visyual Ear. V2.0";
+const char  Branch[]  = "Main";
+const char  Description[]  = "104 Bands.  43Hz to 16744 Hz";
+
 // -- LED Display Constants
 #define START_NOISE_FLOOR   60  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)  was 80
 #define BASE_NOISE_FLOOR    40  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
@@ -86,6 +91,9 @@ void setup() {
   // read NV Ram
   setDisplayMode( EEPROM.read(MODE_ADDRESS));
   setGain(EEPROM.read(GAIN_ADDRESS));
+  Serial.println(Version);
+  Serial.println(Branch);
+  Serial.println(Description);
   delay(500);
 
   initDisplay();
@@ -151,10 +159,12 @@ void  runAGC(){
   
   float OCR = (float)activeBands / (float)NUM_BANDS;
   
+  /*
   Serial.print("AB ");
   Serial.print(activeBands);
   Serial.print(", GN ");
   Serial.println(gainNumber);
+  */
 
   if (OCR < lowTrip) {
     upGainAccumulator += 0.01;
