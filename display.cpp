@@ -151,10 +151,15 @@ void  showMode () {
 // Configure the LED string and preload the color values for each band.
 void  initFFTDisplay(int numberBands) {
 
-  const double MIN_GAIN_SCALE  = 0.00125;
-  const double MAX_GAIN_SCALE  = 0.10; 
-  const double LOW_TRIP        = 0.05; 
-  const double HIGH_TRIP       = 0.25; // Was 0.3
+//  const double MIN_GAIN_SCALE  = 0.00125;
+//  const double MAX_GAIN_SCALE  = 0.10; 
+//  const double LOW_TRIP        = 0.05; 
+//  const double HIGH_TRIP       = 0.25; // Was 0.3
+
+  const double MIN_GAIN_SCALE  = 0.001;
+  const double MAX_GAIN_SCALE  = 0.05;
+  const double LOW_TRIP        = 0.04; 
+  const double HIGH_TRIP       = 0.30; // Was 0.35
   
   minScale  = MIN_GAIN_SCALE;   
   gainSlope = pow((MAX_GAIN_SCALE / MIN_GAIN_SCALE), 1.0 / MAX_GAIN_NUM);   

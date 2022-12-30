@@ -21,6 +21,11 @@
 #define  FASTLED_INTERNAL
 #include "FastLED.h"
 
+// Set project identification here
+const char  Version[] = "Visyual Ear. V1.0";
+const char  Branch[]  = "MultiBand";
+const char  Description[]  = "4x24 Bands.  55Hz to 14KHz";
+
 // -- LED Display Constants
 #define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
@@ -77,8 +82,11 @@ void setup() {
   // read NV Ram
   setDisplayMode( EEPROM.read(MODE_ADDRESS));
   setGain(EEPROM.read(GAIN_ADDRESS));
-  delay(500);
 
+  Serial.println(Version);
+  Serial.println(Branch);
+  Serial.println(Description);
+  delay(500);
   initDisplay();
 }
 

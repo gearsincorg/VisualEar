@@ -2,7 +2,7 @@
 #define devconf_h
 
 // Debug Information
-#define SHOW_GAINS 1
+#define SHOW_GAINS 0
 #define SHOW_BANKS 0
 #define SHOW_RAW   0
 #define SHOW_FILT  0
