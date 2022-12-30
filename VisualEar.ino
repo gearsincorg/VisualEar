@@ -27,7 +27,6 @@ const char  Branch[]  = "MultiBand";
 const char  Description[]  = "4x24 Bands.  55Hz to 14KHz";
 
 // -- LED Display Constants
-#define START_NOISE_FLOOR   80                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
 
 #define UI_HOLD_MS      3000
