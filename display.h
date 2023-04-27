@@ -7,6 +7,14 @@
 
 #define MODE_CHANGE_PAUSE   1000
 
+#define NUM_MODES           3
+
+#define MODE_OFF            0
+#define MODE_FOUNTAIN       1
+#define MODE_SPECTRUM       2
+#define MODE_TONE           3
+#define MODE_VU             4
+
 #define BALL_THRESHOLD      50
 #define MAX_BALLS           40                  // maximum number of balls in the air
 #define MAX_BAND_BALLS       1

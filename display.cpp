@@ -65,22 +65,20 @@ void  initDisplay(){
   
   switch (displayMode) {
     default:
-    case 0:
+    case MODE_OFF:
       break;
 
-    case 1:
+    case MODE_VU:
       orangeLED   = (int)((ORANGE_DB - MIN_DB) / DB_PER_LED);
       redLED      = (int)((RED_DB    - MIN_DB) / DB_PER_LED);
       break;
       
-    case 2:
-      initFFTDisplay(NUM_BANDS);
-
-    case 3:
+    case MODE_SPECTRUM:
+    case MODE_TONE:
       initFFTDisplay(NUM_BANDS);
       break;
 
-    case 4:
+    case MODE_FOUNTAIN:
       initBallDisplay(NUM_BANDS);
       break;
   }
@@ -91,21 +89,20 @@ void  updateDisplay(uint32_t * bandValues) {
   if (millis() > modeChangeRelease) {
     switch (displayMode) {
       default:
-      case 0:
+      case MODE_OFF:
         break;
       
-      case 2:
+      case MODE_SPECTRUM:
         updateFFTDisplay(bandValues);
         break;
   
-      case 3:
-        updateToneDisplay(bandValues);
-        break;
-
-      case 4:
+      case MODE_FOUNTAIN:
         updateBallDisplay(bandValues);
         break;
           
+      case MODE_TONE:
+        updateToneDisplay(bandValues);
+        break;
     }
   }
 }
@@ -139,7 +136,7 @@ void  showMode () {
   FastLED.clearData();
   FastLED.show();
   for (int I = 0; I < displayMode; I++) {
-    setLEDBand(I * 8, MAX_LED_BRIGHTNESS); 
+    setLED(I * 10, 200, MAX_LED_BRIGHTNESS); 
   }
   FastLED.show();
 }

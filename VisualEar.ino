@@ -22,9 +22,10 @@
 #include "FastLED.h"
 
 // Set project identification here
-const char  Version[] = "Visyual Ear. V1.0";
-const char  Branch[]  = "MultiBand";
+const char  Version[] = "Visual Ear. V3.0 ";
+const char  Branch[]  = "MultiBand 4 x 2 Octave";
 const char  Description[]  = "4x24 Bands.  55Hz to 14KHz";
+const char  Modes[]  = " Display modes";
 
 // -- LED Display Constants
 #define BASE_NOISE_FLOOR    40                    // Frequency Bin Magnitudes below this value will not get summed into Bands. (Final minimumm value)
@@ -82,10 +83,13 @@ void setup() {
   setDisplayMode( EEPROM.read(MODE_ADDRESS));
   setGain(EEPROM.read(GAIN_ADDRESS));
 
+  // Identify this version to the Console
   Serial.println(Version);
   Serial.println(Branch);
   Serial.println(Description);
-  delay(500);
+  Serial.print(NUM_MODES);
+  Serial.println(Modes);
+  delay(100);
   initDisplay();
 }
 
@@ -93,7 +97,7 @@ void loop() {
   // check the button and see if we have a change
   runUI();
 
-  if (getDisplayMode() == 1) {       
+  if (getDisplayMode() == MODE_VU) {       
     if (peak.available()){
       updateVuDisplay(peak.readPeakToPeak());
     }

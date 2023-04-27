@@ -8,7 +8,6 @@
 #define SHOW_FILT  0
 
 #define FLIP_LED_ORDER      true
-#define NUM_MODES 5
 
 #define SUB_BANDS           24                     // Number of sub
 #define NUM_FFTS             4                     // Number of FFTs
