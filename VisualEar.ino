@@ -90,7 +90,11 @@ void setup() {
   setDisplayMode( EEPROM.read(MODE_ADDRESS));
   setGain(EEPROM.read(GAIN_ADDRESS));
   delay(500);
-
+  Serial.print("Visual Ear 2.0");
+  Serial.print("Tri Frequency 37, 48, 52 bands");
+  Serial.print("43-174 hz, 174-1046 hz, 1046-16733 hz");
+  Serial.print("4 Modes");
+  
   initDisplay();
 }
 
