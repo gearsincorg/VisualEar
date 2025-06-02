@@ -19,6 +19,7 @@
 #define GRAVITY            -1.9                //  was 1.5
 
 #define LED_PER_METER       60
+#define TOWER_HEIGHT        2
 
 extern double minScale;
 extern double gainSlope;
@@ -46,6 +47,7 @@ int   flipLEDs(int num);
 void  addBalls(uint32_t * bandValues);
 void  addBall(float vel, int  band);
 void  moveBalls();
+void  moveBubbles();
 void  displayBalls();
 
 double  spikeFilter(double filter, double live, double upTC, double downTC);

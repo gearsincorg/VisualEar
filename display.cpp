@@ -65,22 +65,26 @@ void  initDisplay(){
   
   switch (displayMode) {
     default:
-    case 0:
+    case 0:   // Off
       break;
 
-    case 1:
+    case 1:  // VU Meter
       orangeLED   = (int)((ORANGE_DB - MIN_DB) / DB_PER_LED);
       redLED      = (int)((RED_DB    - MIN_DB) / DB_PER_LED);
       break;
       
-    case 2:
+    case 2:  // FFT
       initFFTDisplay(NUM_BANDS);
 
-    case 3:
+    case 3:  // Tone
       initFFTDisplay(NUM_BANDS);
       break;
 
-    case 4:
+    case 4:  //  Fireworks
+      initBallDisplay(NUM_BANDS);
+      break;
+
+    case 5:  // Bubbles
       initBallDisplay(NUM_BANDS);
       break;
   }
@@ -91,18 +95,22 @@ void  updateDisplay(uint32_t * bandValues) {
   if (millis() > modeChangeRelease) {
     switch (displayMode) {
       default:
-      case 0:
+      case 0:  //Off
         break;
       
-      case 2:
+      case 2: // FFT
         updateFFTDisplay(bandValues);
         break;
   
-      case 3:
+      case 3: // TONE
         updateToneDisplay(bandValues);
         break;
 
-      case 4:
+      case 4:  // Fireworks
+        updateBallDisplay(bandValues);
+        break;
+          
+      case 5:  // Bubbles
         updateBallDisplay(bandValues);
         break;
           
@@ -250,8 +258,13 @@ void updateBallDisplay (uint32_t * bandValues){
   
     // Update LED display
     displayBalls();
-    moveBalls();
+    if (displayMode == 4) {
+      moveBalls();
+    } else {
+      moveBubbles();
+    }
 }
+
 
 void  addBalls(uint32_t * bandValues){
     uint32_t val;
@@ -301,6 +314,31 @@ void  moveBalls() {
 
       // has the ball hit the ground?
       if (pos[ball] <= 0) {
+
+        // remove this ball and move all others down.
+        nextBall--;
+        numBalls[band[ball]]--;
+        
+        for (int b = ball; b < nextBall; b++) {
+          pos[b] = pos[b+1];
+          vel[b] = vel[b+1];
+          band[b] = band[b+1];
+        }
+      }
+    }
+    lastMoveMs =tnow;
+}
+
+void  moveBubbles() {
+    uint32_t tnow     = millis();  
+    double elapsed = (double)(tnow - lastMoveMs) * 0.001;  
+
+    // process each ball
+    for (int ball = 0; ball < nextBall; ball++) {
+      pos[ball] += vel[ball] * (elapsed / 2); 
+
+      // has the ball floated to the top
+      if (pos[ball] > TOWER_HEIGHT) {
 
         // remove this ball and move all others down.
         nextBall--;

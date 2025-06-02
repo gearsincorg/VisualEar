@@ -3,7 +3,7 @@
   Audio spectrum analyser
   LED strip display.
   For details see:  https://hackaday.io/project/175944-the-visual-ear
-  Copyright (C) 2021 Philip Malone
+  Copyright (C) 2021-5 Philip Malone
 
   Display Modes:
   0 - Off
@@ -11,9 +11,11 @@
   2 - Specturm Analyser
   3 - Tone Detector
   4 - Fireworks
+  5 - Ocean
 
   Version Date      Description
   2.0     2/2/2022  First release with 4 functions and 104 LEDs
+  3.0     6/1/2025  Added Ocean mode with bubbles.
   
 */
 
@@ -30,9 +32,10 @@
 #include "FastLED.h"
 
 // Set project identification here
-const char  Version[] = "Visyual Ear. V2.0";
-const char  Branch[]  = "Main";
+const char  Version[] = "Visual Ear. V4.0";
+const char  Branch[]  = "Add Ocean";
 const char  Description[]  = "104 Bands.  43Hz to 16744 Hz";
+const char  Modes[]  = "(0) Off, (1) VU, (2) Spectrum, (3) Tone, (4) Fireworks, (5) Ocean";
 
 // -- LED Display Constants
 #define START_NOISE_FLOOR   60  // Frequency Bin Magnitudes below this value will not get summed into Bands. (Initial high value)  was 80
@@ -94,7 +97,8 @@ void setup() {
   Serial.println(Version);
   Serial.println(Branch);
   Serial.println(Description);
-  delay(500);
+  Serial.println(Modes);
+  delay(100);
 
   initDisplay();
 }
